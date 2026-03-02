@@ -2,8 +2,9 @@ import React from "react";
 
 import { getDesktopApiOrNull } from "@ipc/desktopApi";
 import { Modal } from "@shared/kit";
-import { openExternal } from "@shared/utils/openExternal";
 import { errorToMessage } from "@shared/toast";
+import { fileToBase64 } from "@shared/utils/base64";
+import { openExternal } from "@shared/utils/openExternal";
 
 import cs from "./CustomSkillUpload.module.css";
 
@@ -47,10 +48,7 @@ export function CustomSkillUploadModal(props: {
       setError(null);
 
       try {
-        const buffer = await file.arrayBuffer();
-        const base64 = btoa(
-          new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
-        );
+        const base64 = await fileToBase64(file);
 
         const api = getDesktopApiOrNull();
         if (!api?.installCustomSkill) {

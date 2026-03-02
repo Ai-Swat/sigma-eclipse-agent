@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDesktopApiOrNull } from "@ipc/desktopApi";
 import { errorToMessage } from "@shared/toast";
+import { uint8ToBase64 } from "@shared/utils/base64";
 import { useWavRecorder } from "./useWavRecorder";
 
 export type VoiceProvider = "openai" | "local";
@@ -44,14 +45,6 @@ export type UseVoiceInputResult = {
   error: string | null;
   isProcessing: boolean;
 };
-
-function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]!);
-  }
-  return btoa(binary);
-}
 
 export function useVoiceInput(gwRequest: GatewayRequest): UseVoiceInputResult {
   const [isRecording, setIsRecording] = useState(false);
