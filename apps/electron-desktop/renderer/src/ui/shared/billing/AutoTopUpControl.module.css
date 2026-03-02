@@ -65,11 +65,16 @@
   border: none;
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.8);
-  font-size: 18px;
+  font-size: 14px;
+  letter-spacing: 1px;
   line-height: 1;
-  border-radius: 999px;
-  width: 34px;
-  height: 34px;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  padding: 0 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 
