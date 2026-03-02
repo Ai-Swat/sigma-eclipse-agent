@@ -39,28 +39,7 @@ export function registerIpcHandlers(params: RegisterParams) {
   registerBackupHandlers(params);
   registerDefenderHandlers(params);
 
-  registerGogIpcHandlers({
-    gogBin: params.gogBin,
-    openclawDir: params.openclawDir,
-    userData: params.userData,
-    stateDir: params.stateDir,
-    gogCredentialsPath: "",
-  });
-  registerWhisperIpcHandlers({
-    whisperCliBin: params.whisperCliBin,
-    whisperDataDir: params.whisperDataDir,
-    getMainWindow: params.getMainWindow,
-    stateDir: params.stateDir,
-    stopGatewayChild: params.stopGatewayChild,
-    startGateway: params.startGateway,
-  });
-  registerResetAndCloseIpcHandler({
-    userData: params.userData,
-    stateDir: params.stateDir,
-    logsDir: params.logsDir,
-    whisperDataDir: params.whisperDataDir,
-    gogBin: params.gogBin,
-    openclawDir: params.openclawDir,
-    stopGatewayChild: params.stopGatewayChild,
-  });
+  registerGogIpcHandlers(params);
+  registerWhisperIpcHandlers(params);
+  registerResetAndCloseIpcHandler(params);
 }

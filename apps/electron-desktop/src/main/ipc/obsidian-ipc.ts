@@ -3,31 +3,15 @@
  */
 import { ipcMain } from "electron";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 import type { ExecResult } from "../../shared/types";
 import type { ObsidianVaultEntry } from "../../shared/types";
+import { getPlatform } from "../platform";
 import type { ObsidianHandlerParams } from "./types";
 import { createBinaryNotFoundResult, runCommand, runSyncCheck } from "./exec";
 
 const PREPARE_CMD = "cd apps/electron-desktop && npm run prepare:obsidian-cli:all";
-
-/** Platform-aware path to Obsidian's obsidian.json config file. */
-function getObsidianConfigPath(): string {
-  switch (process.platform) {
-    case "win32":
-      return path.join(
-        process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"),
-        "obsidian",
-        "obsidian.json"
-      );
-    case "linux":
-      return path.join(os.homedir(), ".config", "obsidian", "obsidian.json");
-    default:
-      return path.join(os.homedir(), "Library", "Application Support", "obsidian", "obsidian.json");
-  }
-}
 
 /** Parse Obsidian's obsidian.json config to extract vault entries. */
 export function parseObsidianVaultsFromJson(payload: unknown): ObsidianVaultEntry[] {
@@ -135,7 +119,7 @@ export function registerObsidianHandlers(params: ObsidianHandlerParams) {
   });
 
   ipcMain.handle("obsidian-vaults-list", async () => {
-    const cfgPath = getObsidianConfigPath();
+    const cfgPath = getPlatform().obsidianConfigPath();
     try {
       if (!fs.existsSync(cfgPath)) {
         return {

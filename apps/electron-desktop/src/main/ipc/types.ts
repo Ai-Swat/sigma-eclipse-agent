@@ -4,9 +4,9 @@
  * only the fields it actually needs are visible in its signature.
  */
 import type { BrowserWindow } from "electron";
-import type { GatewayState } from "../types";
+import type { BinaryPaths, GatewayState } from "../types";
 
-export type RegisterParams = {
+export type RegisterParams = BinaryPaths & {
   getMainWindow: () => BrowserWindow | null;
   getGatewayState: () => GatewayState | null;
   getLogsDir: () => string | null;
@@ -17,12 +17,6 @@ export type RegisterParams = {
   stateDir: string;
   logsDir: string;
   openclawDir: string;
-  gogBin: string;
-  memoBin: string;
-  remindctlBin: string;
-  obsidianCliBin: string;
-  ghBin: string;
-  whisperCliBin: string;
   whisperDataDir: string;
   stopGatewayChild: () => Promise<void>;
   getGatewayToken: () => string;
@@ -52,3 +46,26 @@ export type BackupHandlerParams = Pick<
   | "acceptConsent"
 >;
 export type DefenderHandlerParams = Pick<RegisterParams, "stateDir">;
+export type WhisperHandlerParams = Pick<
+  RegisterParams,
+  | "whisperCliBin"
+  | "whisperDataDir"
+  | "getMainWindow"
+  | "stateDir"
+  | "stopGatewayChild"
+  | "startGateway"
+>;
+export type GogHandlerParams = Pick<
+  RegisterParams,
+  "gogBin" | "openclawDir" | "userData" | "stateDir"
+>;
+export type ResetHandlerParams = Pick<
+  RegisterParams,
+  | "userData"
+  | "stateDir"
+  | "logsDir"
+  | "whisperDataDir"
+  | "gogBin"
+  | "openclawDir"
+  | "stopGatewayChild"
+>;

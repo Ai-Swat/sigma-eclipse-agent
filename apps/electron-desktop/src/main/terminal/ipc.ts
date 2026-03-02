@@ -1,4 +1,7 @@
 import { ipcMain, type BrowserWindow } from "electron";
+
+import type { BinaryPaths } from "../types";
+import { IPC } from "../../shared/ipc-channels";
 import {
   createTerminal,
   writeTerminal,
@@ -12,18 +15,14 @@ import {
 /**
  * Register IPC handlers for the embedded terminal (multi-session PTY).
  */
-export function registerTerminalIpcHandlers(params: {
-  getMainWindow: () => BrowserWindow | null;
-  stateDir: string;
-  openclawDir: string;
-  nodeBin: string;
-  gogBin?: string;
-  jqBin?: string;
-  memoBin?: string;
-  remindctlBin?: string;
-  obsidianCliBin?: string;
-  ghBin?: string;
-}) {
+export function registerTerminalIpcHandlers(
+  params: Partial<BinaryPaths> & {
+    getMainWindow: () => BrowserWindow | null;
+    stateDir: string;
+    openclawDir: string;
+    nodeBin: string;
+  }
+) {
   const baseParams: CreateTerminalParams = {
     getMainWindow: params.getMainWindow,
     stateDir: params.stateDir,
@@ -37,11 +36,11 @@ export function registerTerminalIpcHandlers(params: {
     ghBin: params.ghBin,
   };
 
-  ipcMain.handle("terminal:create", async () => {
+  ipcMain.handle(IPC.terminalCreate, async () => {
     return createTerminal(baseParams);
   });
 
-  ipcMain.handle("terminal:write", async (_evt, p: { id?: unknown; data?: unknown }) => {
+  ipcMain.handle(IPC.terminalWrite, async (_evt, p: { id?: unknown; data?: unknown }) => {
     const id = typeof p?.id === "string" ? p.id : "";
     const data = typeof p?.data === "string" ? p.data : "";
     if (id && data) {
@@ -50,7 +49,7 @@ export function registerTerminalIpcHandlers(params: {
   });
 
   ipcMain.handle(
-    "terminal:resize",
+    IPC.terminalResize,
     async (_evt, p: { id?: unknown; cols?: unknown; rows?: unknown }) => {
       const id = typeof p?.id === "string" ? p.id : "";
       const cols = typeof p?.cols === "number" ? p.cols : 80;
@@ -61,18 +60,18 @@ export function registerTerminalIpcHandlers(params: {
     }
   );
 
-  ipcMain.handle("terminal:kill", async (_evt, p: { id?: unknown }) => {
+  ipcMain.handle(IPC.terminalKill, async (_evt, p: { id?: unknown }) => {
     const id = typeof p?.id === "string" ? p.id : "";
     if (id) {
       killTerminal(id);
     }
   });
 
-  ipcMain.handle("terminal:list", async () => {
+  ipcMain.handle(IPC.terminalList, async () => {
     return listTerminals();
   });
 
-  ipcMain.handle("terminal:get-buffer", async (_evt, p: { id?: unknown }) => {
+  ipcMain.handle(IPC.terminalGetBuffer, async (_evt, p: { id?: unknown }) => {
     const id = typeof p?.id === "string" ? p.id : "";
     if (!id) {
       return "";

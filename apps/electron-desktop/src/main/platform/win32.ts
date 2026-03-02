@@ -126,6 +126,14 @@ export class Win32Platform implements Platform {
     return paths;
   }
 
+  obsidianConfigPath(): string {
+    return path.join(
+      process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"),
+      "obsidian",
+      "obsidian.json"
+    );
+  }
+
   // ── File system ─────────────────────────────────────────────────────────
 
   restrictFilePermissions(_filePath: string): void {

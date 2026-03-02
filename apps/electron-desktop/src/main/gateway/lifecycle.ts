@@ -1,7 +1,7 @@
 import type { BrowserWindow } from "electron";
 import type { Platform } from "../platform";
 import type { AppState } from "../app-state";
-import type { GatewayState } from "../types";
+import type { BinaryPaths, GatewayState } from "../types";
 import type { TailBuffer } from "../util/net";
 import { IPC_EVENTS } from "../../shared/ipc-channels";
 import { spawnGateway } from "./spawn";
@@ -61,7 +61,7 @@ export async function stopGatewayChild(state: AppState, platform: Platform): Pro
   state.gatewayPid = null;
 }
 
-export type GatewayStarterDeps = {
+export type GatewayStarterDeps = BinaryPaths & {
   state: AppState;
   platform: Platform;
   stderrTail: TailBuffer;
@@ -74,13 +74,6 @@ export type GatewayStarterDeps = {
   url: string;
   openclawDir: string;
   nodeBin: string;
-  gogBin: string;
-  jqBin: string;
-  memoBin: string;
-  remindctlBin: string;
-  obsidianCliBin: string;
-  ghBin: string;
-  whisperCliBin: string;
   whisperDataDir: string;
 };
 

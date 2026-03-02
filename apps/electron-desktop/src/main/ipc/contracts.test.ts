@@ -20,12 +20,15 @@ import type {
   DefenderHandlerParams,
   FileHandlerParams,
   GhHandlerParams,
+  GogHandlerParams,
   KeyHandlerParams,
   MemoHandlerParams,
   ObsidianHandlerParams,
   OAuthHandlerParams,
   RemindctlHandlerParams,
+  ResetHandlerParams,
   SkillHandlerParams,
+  WhisperHandlerParams,
 } from "./types";
 import type { registerFileHandlers } from "./files";
 import type { registerKeyHandlers } from "./keys-ipc";
@@ -38,6 +41,9 @@ import type { registerOAuthHandlers } from "./oauth-ipc";
 import type { registerSkillHandlers } from "./skills-ipc";
 import type { registerBackupHandlers } from "./backup-ipc";
 import type { registerDefenderHandlers } from "./defender-ipc";
+import type { registerWhisperIpcHandlers } from "../whisper/ipc";
+import type { registerGogIpcHandlers } from "../gog/ipc";
+import type { registerResetAndCloseIpcHandler } from "../reset/ipc";
 
 // Terminal channels are registered by registerTerminalIpcHandlers (separate call in main.ts).
 const TERMINAL_CHANNELS = new Set([
@@ -52,35 +58,39 @@ const TERMINAL_CHANNELS = new Set([
 /** All IPC channels that must be registered by registerIpcHandlers + sub-registrations. */
 const EXPECTED_CHANNELS: string[] = Object.values(IPC).filter((ch) => !TERMINAL_CHANNELS.has(ch));
 
+function createMockParams() {
+  return {
+    getMainWindow: () => null,
+    getGatewayState: () => null,
+    getLogsDir: () => "/tmp/logs",
+    getConsentAccepted: () => true,
+    acceptConsent: vi.fn(async () => {}),
+    startGateway: vi.fn(async () => {}),
+    userData: "/tmp/user",
+    stateDir: "/tmp/state",
+    logsDir: "/tmp/logs",
+    openclawDir: "/tmp/openclaw",
+    gogBin: "/bin/gog",
+    jqBin: "/bin/jq",
+    memoBin: "/bin/memo",
+    remindctlBin: "/bin/remindctl",
+    obsidianCliBin: "/bin/obsidian-cli",
+    ghBin: "/bin/gh",
+    whisperCliBin: "/bin/whisper-cli",
+    whisperDataDir: "/tmp/whisper",
+    stopGatewayChild: vi.fn(async () => {}),
+    getGatewayToken: vi.fn(() => "test-token"),
+    setGatewayToken: vi.fn(),
+  };
+}
+
 describe("IPC channel contracts", () => {
   beforeEach(() => {
     vi.mocked(ipcMain.handle).mockReset();
   });
 
   it("registers all expected channels", () => {
-    const mockParams = {
-      getMainWindow: () => null,
-      getGatewayState: () => null,
-      getLogsDir: () => "/tmp/logs",
-      getConsentAccepted: () => true,
-      acceptConsent: vi.fn(async () => {}),
-      startGateway: vi.fn(async () => {}),
-      userData: "/tmp/user",
-      stateDir: "/tmp/state",
-      logsDir: "/tmp/logs",
-      openclawDir: "/tmp/openclaw",
-      gogBin: "/bin/gog",
-      memoBin: "/bin/memo",
-      remindctlBin: "/bin/remindctl",
-      obsidianCliBin: "/bin/obsidian-cli",
-      ghBin: "/bin/gh",
-      whisperCliBin: "/bin/whisper-cli",
-      stopGatewayChild: vi.fn(async () => {}),
-      getGatewayToken: vi.fn(() => "test-token"),
-      setGatewayToken: vi.fn(),
-    };
-
-    registerIpcHandlers(mockParams);
+    registerIpcHandlers(createMockParams());
 
     const registeredChannels = vi.mocked(ipcMain.handle).mock.calls.map((call) => call[0]);
 
@@ -90,29 +100,7 @@ describe("IPC channel contracts", () => {
   });
 
   it("does not register unexpected channels", () => {
-    const mockParams = {
-      getMainWindow: () => null,
-      getGatewayState: () => null,
-      getLogsDir: () => "/tmp/logs",
-      getConsentAccepted: () => true,
-      acceptConsent: vi.fn(async () => {}),
-      startGateway: vi.fn(async () => {}),
-      userData: "/tmp/user",
-      stateDir: "/tmp/state",
-      logsDir: "/tmp/logs",
-      openclawDir: "/tmp/openclaw",
-      gogBin: "/bin/gog",
-      memoBin: "/bin/memo",
-      remindctlBin: "/bin/remindctl",
-      obsidianCliBin: "/bin/obsidian-cli",
-      ghBin: "/bin/gh",
-      whisperCliBin: "/bin/whisper-cli",
-      stopGatewayChild: vi.fn(async () => {}),
-      getGatewayToken: vi.fn(() => "test-token"),
-      setGatewayToken: vi.fn(),
-    };
-
-    registerIpcHandlers(mockParams);
+    registerIpcHandlers(createMockParams());
 
     const registeredChannels = vi.mocked(ipcMain.handle).mock.calls.map((call) => call[0]);
 
@@ -150,5 +138,12 @@ describe("IPC handler param narrowing", () => {
     expectTypeOf<
       Parameters<typeof registerDefenderHandlers>[0]
     >().toEqualTypeOf<DefenderHandlerParams>();
+    expectTypeOf<
+      Parameters<typeof registerWhisperIpcHandlers>[0]
+    >().toEqualTypeOf<WhisperHandlerParams>();
+    expectTypeOf<Parameters<typeof registerGogIpcHandlers>[0]>().toEqualTypeOf<GogHandlerParams>();
+    expectTypeOf<
+      Parameters<typeof registerResetAndCloseIpcHandler>[0]
+    >().toEqualTypeOf<ResetHandlerParams>();
   });
 });

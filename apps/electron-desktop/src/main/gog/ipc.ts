@@ -3,31 +3,17 @@ import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { IPC } from "../../shared/ipc-channels";
+import { checkBinaryExists } from "../ipc/exec";
+import type { GogHandlerParams } from "../ipc/types";
 import { ensureDir } from "../util/fs";
 import { getPlatform } from "../platform";
 import { ensureGogCredentialsConfigured, runGog } from "./gog";
 import type { GogExecResult } from "./types";
 
-export function registerGogIpcHandlers(params: {
-  gogBin: string;
-  openclawDir: string;
-  userData: string;
-  stateDir: string;
-}): void;
-export function registerGogIpcHandlers(params: {
-  gogBin: string;
-  gogCredentialsPath: string;
-  openclawDir: string;
-  userData: string;
-  stateDir: string;
-}): void;
-export function registerGogIpcHandlers(params: {
-  gogBin: string;
-  gogCredentialsPath?: string;
-  openclawDir: string;
-  userData: string;
-  stateDir: string;
-}) {
+const PREPARE_CMD = "cd apps/electron-desktop && npm run fetch:gog";
+
+export function registerGogIpcHandlers(params: GogHandlerParams) {
   const { gogBin, openclawDir, userData, stateDir } = params;
 
   // Discover the staged OAuth client secret used for "gog auth add".
@@ -46,37 +32,21 @@ export function registerGogIpcHandlers(params: {
     "credentials",
     "gog-client-secret.json"
   );
-  const gogCredentialsPath =
-    typeof params.gogCredentialsPath === "string" && params.gogCredentialsPath.trim()
-      ? params.gogCredentialsPath.trim()
-      : fs.existsSync(bundledCredentialsPath)
-        ? bundledCredentialsPath
-        : devCredentialsPath;
+  const gogCredentialsPath = fs.existsSync(bundledCredentialsPath)
+    ? bundledCredentialsPath
+    : devCredentialsPath;
 
-  ipcMain.handle("gog-auth-list", async () => {
-    if (!fs.existsSync(gogBin)) {
-      return {
-        ok: false,
-        code: null,
-        stdout: "",
-        stderr: `gog binary not found at: ${gogBin}\nRun: cd apps/electron-desktop && npm run fetch:gog`,
-      } satisfies GogExecResult;
-    }
-    const res = await runGog({ bin: gogBin, args: ["auth", "list"], cwd: openclawDir });
-    return res;
+  ipcMain.handle(IPC.gogAuthList, async () => {
+    const notFound = checkBinaryExists(gogBin, PREPARE_CMD);
+    if (notFound) return notFound;
+    return await runGog({ bin: gogBin, args: ["auth", "list"], cwd: openclawDir });
   });
 
   ipcMain.handle(
-    "gog-auth-add",
+    IPC.gogAuthAdd,
     async (_evt, p: { account?: unknown; services?: unknown; noInput?: unknown }) => {
-      if (!fs.existsSync(gogBin)) {
-        return {
-          ok: false,
-          code: null,
-          stdout: "",
-          stderr: `gog binary not found at: ${gogBin}\nRun: cd apps/electron-desktop && npm run fetch:gog`,
-        } satisfies GogExecResult;
-      }
+      const notFound = checkBinaryExists(gogBin, PREPARE_CMD);
+      if (notFound) return notFound;
       const account = typeof p?.account === "string" ? p.account.trim() : "";
       const services = typeof p?.services === "string" ? p.services.trim() : "gmail";
       const noInput = Boolean(p?.noInput);
@@ -108,16 +78,10 @@ export function registerGogIpcHandlers(params: {
   );
 
   ipcMain.handle(
-    "gog-auth-credentials",
+    IPC.gogAuthCredentials,
     async (_evt, p: { credentialsJson?: unknown; filename?: unknown }) => {
-      if (!fs.existsSync(gogBin)) {
-        return {
-          ok: false,
-          code: null,
-          stdout: "",
-          stderr: `gog binary not found at: ${gogBin}\nRun: cd apps/electron-desktop && npm run fetch:gog`,
-        } satisfies GogExecResult;
-      }
+      const notFound = checkBinaryExists(gogBin, PREPARE_CMD);
+      if (notFound) return notFound;
       const text = typeof p?.credentialsJson === "string" ? p.credentialsJson : "";
       if (!text.trim()) {
         return {

@@ -2,22 +2,16 @@ import { app, ipcMain, session } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { IPC } from "../../shared/ipc-channels";
 import { clearGogAuthTokens } from "../gog/gog";
+import type { ResetHandlerParams } from "../ipc/types";
 import type { ResetAndCloseResult } from "../types";
 
-export function registerResetAndCloseIpcHandler(params: {
-  userData: string;
-  stateDir: string;
-  logsDir: string;
-  whisperDataDir: string;
-  gogBin: string;
-  openclawDir: string;
-  stopGatewayChild: () => Promise<void>;
-}) {
+export function registerResetAndCloseIpcHandler(params: ResetHandlerParams) {
   const { userData, stateDir, logsDir, whisperDataDir, gogBin, openclawDir, stopGatewayChild } =
     params;
 
-  ipcMain.handle("reset-and-close", async () => {
+  ipcMain.handle(IPC.resetAndClose, async () => {
     const warnings: string[] = [];
 
     try {

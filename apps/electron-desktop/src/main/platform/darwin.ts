@@ -282,6 +282,14 @@ export class DarwinPlatform implements Platform {
     return paths;
   }
 
+  obsidianConfigPath(): string {
+    // DarwinPlatform is also used for linux (see platform/index.ts).
+    if (process.platform === "linux") {
+      return path.join(os.homedir(), ".config", "obsidian", "obsidian.json");
+    }
+    return path.join(os.homedir(), "Library", "Application Support", "obsidian", "obsidian.json");
+  }
+
   // ── File system ─────────────────────────────────────────────────────────
 
   restrictFilePermissions(filePath: string): void {

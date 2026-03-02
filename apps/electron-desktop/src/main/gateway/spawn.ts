@@ -2,31 +2,28 @@ import { spawn, type ChildProcess } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import type { BinaryPaths } from "../types";
 import { ensureDir } from "../util/fs";
 import { getPlatform } from "../platform";
 import type { TailBuffer } from "../util/net";
-import { getModelDef, resolveFfmpegPath, resolveModelPath } from "../whisper/ipc";
+import { resolveFfmpegPath } from "../whisper/ffmpeg";
 import { readSelectedWhisperModel } from "../whisper/model-state";
+import { getModelDef, resolveModelPath } from "../whisper/models";
 
-export function spawnGateway(params: {
-  port: number;
-  logsDir: string;
-  stateDir: string;
-  configPath: string;
-  token: string;
-  openclawDir: string;
-  nodeBin: string;
-  gogBin?: string;
-  jqBin?: string;
-  memoBin?: string;
-  remindctlBin?: string;
-  obsidianCliBin?: string;
-  ghBin?: string;
-  whisperCliBin?: string;
-  whisperDataDir?: string;
-  electronRunAsNode?: boolean;
-  stderrTail: TailBuffer;
-}): ChildProcess {
+export function spawnGateway(
+  params: Partial<BinaryPaths> & {
+    port: number;
+    logsDir: string;
+    stateDir: string;
+    configPath: string;
+    token: string;
+    openclawDir: string;
+    nodeBin: string;
+    whisperDataDir?: string;
+    electronRunAsNode?: boolean;
+    stderrTail: TailBuffer;
+  }
+): ChildProcess {
   const {
     port,
     logsDir,

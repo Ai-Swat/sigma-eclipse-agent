@@ -4,6 +4,7 @@ import * as path from "node:path";
 
 import type { AppState } from "../app-state";
 import type { Platform } from "../platform";
+import type { BinaryPaths } from "../types";
 import { DEFAULT_PORT } from "../constants";
 import { readConsentAccepted, writeConsentAccepted } from "../consent";
 import { runConfigMigrations } from "../gateway/config-migrations";
@@ -69,13 +70,15 @@ export async function bootstrapApp(params: {
     ? resolveBundledNodeBin()
     : (process.env.OPENCLAW_DESKTOP_NODE_BIN || "node").trim() || "node";
   const binOpts = { isPackaged: app.isPackaged, mainDir: params.mainDir };
-  const gogBin = resolveBin("gog", binOpts);
-  const jqBin = resolveBin("jq", binOpts);
-  const memoBin = resolveBin("memo", binOpts);
-  const remindctlBin = resolveBin("remindctl", binOpts);
-  const obsidianCliBin = resolveBin("obsidian-cli", binOpts);
-  const ghBin = resolveBin("gh", binOpts);
-  const whisperCliBin = resolveBin("whisper-cli", binOpts);
+  const bins: BinaryPaths = {
+    gogBin: resolveBin("gog", binOpts),
+    jqBin: resolveBin("jq", binOpts),
+    memoBin: resolveBin("memo", binOpts),
+    remindctlBin: resolveBin("remindctl", binOpts),
+    obsidianCliBin: resolveBin("obsidian-cli", binOpts),
+    ghBin: resolveBin("gh", binOpts),
+    whisperCliBin: resolveBin("whisper-cli", binOpts),
+  };
 
   const port = await pickPort(DEFAULT_PORT);
   const url = `http://127.0.0.1:${port}/`;
@@ -105,6 +108,7 @@ export async function bootstrapApp(params: {
 
   const stderrTail = createTailBuffer(24_000);
   const startGateway = createGatewayStarter({
+    ...bins,
     state: params.state,
     platform: params.platform,
     stderrTail,
@@ -117,17 +121,11 @@ export async function bootstrapApp(params: {
     url,
     openclawDir,
     nodeBin,
-    gogBin,
-    jqBin,
-    memoBin,
-    remindctlBin,
-    obsidianCliBin,
-    ghBin,
-    whisperCliBin,
     whisperDataDir,
   });
 
   registerIpcHandlers({
+    ...bins,
     getMainWindow: () => params.state.mainWindow,
     getGatewayState: () => params.state.gatewayState,
     getLogsDir: () => params.state.logsDirForUi,
@@ -141,12 +139,6 @@ export async function bootstrapApp(params: {
     stateDir,
     logsDir,
     openclawDir,
-    gogBin,
-    memoBin,
-    remindctlBin,
-    obsidianCliBin,
-    ghBin,
-    whisperCliBin,
     whisperDataDir,
     stopGatewayChild: params.stopGatewayChild,
     getGatewayToken: () => token,
@@ -156,16 +148,11 @@ export async function bootstrapApp(params: {
   });
 
   registerTerminalIpcHandlers({
+    ...bins,
     getMainWindow: () => params.state.mainWindow,
     stateDir,
     openclawDir,
     nodeBin,
-    gogBin,
-    jqBin,
-    memoBin,
-    remindctlBin,
-    obsidianCliBin,
-    ghBin,
   });
 
   await startGateway();

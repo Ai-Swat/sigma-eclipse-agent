@@ -109,3 +109,83 @@ ui/settings/
 - **Per-component CSS**: lives next to the component (e.g. `chat/ChatComposer.css`).
 - **Global CSS**: lives in `ui/styles/` and is imported once via `ui/styles/index.css` in `main.tsx`.
 - Some component CSS is imported in `main.tsx` for global side-effect styles (Sidebar.css, chat transcript styles). Keep this pattern when adding new global-scope component styles.
+
+## Main-Process Architecture
+
+Source: `src/main/`
+
+```
+src/main/
+├── bootstrap/          # app-bootstrap.ts (wiring), app-lifecycle.ts (events, quit, deep-link)
+├── gateway/            # config.ts, lifecycle.ts, spawn.ts, pid-file.ts, config-migrations.ts
+├── ipc/                # IPC handler modules (one per domain) + register.ts orchestrator + types.ts
+│   └── backup/         # backup sub-services (archive, restore, dialog, config-patch)
+├── platform/           # Platform abstraction: types.ts (interface), darwin.ts, win32.ts, index.ts
+├── whisper/            # models.ts (data), download.ts (util), ffmpeg.ts, model-state.ts, ipc.ts
+├── gog/                # gog.ts (exec helper), ipc.ts, types.ts
+├── reset/              # ipc.ts (reset-and-close handler)
+├── terminal/           # ipc.ts + pty-manager.ts (multi-session PTY)
+├── keys/               # API key storage + auth profiles
+├── openclaw/           # paths.ts (binary/renderer path resolution)
+├── util/               # fs.ts, net.ts (port picking, tail buffer)
+├── window/             # mainWindow.ts, window-manager.ts
+├── auth/               # anthropic.ts
+├── app-state.ts        # mutable AppState type + factory
+├── types.ts            # BinaryPaths, GatewayState, ResetAndCloseResult
+├── constants.ts        # DEFAULT_PORT
+├── consent.ts          # consent read/write
+├── tray.ts             # system tray
+├── updater.ts          # auto-updater
+├── update-splash.ts    # macOS update splash screen
+└── deep-link.ts        # deep-link parsing
+```
+
+### Adding a new IPC channel (checklist)
+
+When adding a new IPC channel, update these files in order:
+
+1. `src/shared/ipc-channels.ts` — add the channel name to the `IPC` object (for invoke/handle) or `IPC_EVENTS` (for one-way main→renderer events).
+2. `src/shared/desktop-bridge-contract.ts` — add the method signature to the `OpenclawDesktopApi` interface and add the key to the `DESKTOP_BRIDGE_KEYS` array.
+3. `src/preload.ts` — implement the bridge method using `ipcRenderer.invoke(IPC.yourChannel, ...)`.
+4. `src/main/ipc/<domain>-ipc.ts` — implement `ipcMain.handle(IPC.yourChannel, ...)` using the `IPC` constant (never hardcoded strings).
+5. `src/main/ipc/types.ts` — if the handler needs new params, add them to `RegisterParams` and update the narrowed `Pick` type for the module.
+6. `src/main/ipc/register.ts` — if adding a new handler module, import and call it here.
+
+The contract test in `src/main/ipc/contracts.test.ts` automatically verifies that all `IPC` channels are registered and all handler modules accept only their narrowed param types.
+
+### IPC handler pattern
+
+Every IPC handler module follows the same pattern:
+
+- **Params:** accept a narrowed `Pick<RegisterParams, ...>` type (defined in `types.ts`).
+- **Channel names:** always use `IPC.*` constants from `src/shared/ipc-channels.ts` — never raw strings.
+- **Registration:** called from `register.ts` with `registerFoo(params)`.
+- **Type safety:** the contract test has `expectTypeOf` assertions for each handler module.
+
+### Platform abstraction
+
+The `Platform` interface (`src/main/platform/types.ts`) abstracts all OS-specific behavior. `DarwinPlatform` is shared by macOS and Linux; `Win32Platform` covers Windows.
+
+- **When to add a Platform method:** any logic that has `if (process.platform === ...)` or `switch (process.platform)` should be a Platform method instead.
+- **When inline checks are OK:** only for truly trivial one-off checks that are unlikely to differ across platforms.
+
+### Binary paths (`BinaryPaths`)
+
+All bundled/external binary paths are grouped in the `BinaryPaths` type (`src/main/types.ts`). They are resolved once in `app-bootstrap.ts` and spread into `RegisterParams`, `GatewayStarterDeps`, and terminal params.
+
+To add a new binary:
+
+1. Add the field to `BinaryPaths` in `src/main/types.ts`.
+2. Add `resolveBin("name", binOpts)` to the `bins` object in `app-bootstrap.ts`.
+3. The field automatically flows to `RegisterParams`, gateway deps, and terminal params via spread.
+4. Add a narrowed `Pick` type if a specific IPC handler needs access.
+
+### Config migrations
+
+Gateway config migrations live in `src/main/gateway/config-migrations.ts`. Each migration has a `version` number, a `description`, and an `apply(cfg)` function that mutates the config in-place.
+
+To add a new migration:
+
+1. Append a new entry to `DESKTOP_CONFIG_MIGRATIONS` with the next version number.
+2. The runner applies all pending migrations (version > stored state) on each app launch.
+3. State is tracked in `desktop-state.json` inside `stateDir`.

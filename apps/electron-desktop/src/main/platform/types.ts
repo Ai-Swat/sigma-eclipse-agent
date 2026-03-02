@@ -67,6 +67,9 @@ export interface Platform {
   /** Ordered list of directories where `appName` may store its config. */
   appConfigSearchPaths(appName: string): string[];
 
+  /** Absolute path to Obsidian's obsidian.json config file. */
+  obsidianConfigPath(): string;
+
   // ── File system ─────────────────────────────────────────────────────────
   /** Best-effort owner-only read/write permissions (chmod 0o600). */
   restrictFilePermissions(filePath: string): void;
