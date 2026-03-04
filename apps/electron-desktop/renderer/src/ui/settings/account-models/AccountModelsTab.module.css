@@ -59,12 +59,6 @@
 
 /* ── Paid account section divider ────────────────────── */
 
-.paidAccountSection {
-  border-top: 1px solid rgba(230, 237, 243, 0.08);
-  padding-top: 20px;
-  margin-top: 4px;
-}
-
 .title {
   color: #fff;
   font-size: 20px;

@@ -64,7 +64,7 @@ function ConnectionToggle(props: {
           onClick={() => void props.onSelect("paid")}
           disabled={props.disabled}
         >
-          Atomic Bot API key
+          Atomic Subscription
         </button>
         <button
           type="button"
@@ -72,7 +72,7 @@ function ConnectionToggle(props: {
           onClick={() => void props.onSelect("self-managed")}
           disabled={props.disabled}
         >
-          Own API key
+          Your own API key
         </button>
       </div>
     </div>
@@ -244,25 +244,28 @@ export function AccountModelsTab(props: {
         onSelect={handleConnectionSelect}
       />
 
-      {isPaidMode && accountState.mode === "paid" && accountState.jwt && (
-        <>
-          <div className={s.dropdownGroup}>
-            <div className={s.dropdownLabel}>Model</div>
-            <RichSelect
-              value={state.activeModelId ?? null}
-              onChange={handleModelChange}
-              options={modelOptions}
-              placeholder={modelOptions.length === 0 ? "No models available" : "Select model…"}
-              disabled={state.modelsLoading || state.modelBusy || modelOptions.length === 0}
-            />
-          </div>
-          {modelOptions.length === 0 && !state.modelsLoading ? (
-            <div className={s.noModelsHint}>
-              No models loaded. Try restarting the app to refresh the model catalog.
+      {isPaidMode &&
+        accountState.mode === "paid" &&
+        accountState.jwt &&
+        !accountState.needsSubscription && (
+          <>
+            <div className={s.dropdownGroup}>
+              <div className={s.dropdownLabel}>Model</div>
+              <RichSelect
+                value={state.activeModelId ?? null}
+                onChange={handleModelChange}
+                options={modelOptions}
+                placeholder={modelOptions.length === 0 ? "No models available" : "Select model…"}
+                disabled={state.modelsLoading || state.modelBusy || modelOptions.length === 0}
+              />
             </div>
-          ) : null}
-        </>
-      )}
+            {modelOptions.length === 0 && !state.modelsLoading ? (
+              <div className={s.noModelsHint}>
+                No models loaded. Try restarting the app to refresh the model catalog.
+              </div>
+            ) : null}
+          </>
+        )}
 
       {!isPaidMode && (
         <>
@@ -287,7 +290,7 @@ export function AccountModelsTab(props: {
                   !selectedProvider
                     ? "Select provider first"
                     : modelOptions.length === 0
-                      ? "No models available"
+                      ? "Enter API key to choose a model"
                       : "Select model…"
                 }
                 disabled={
@@ -324,11 +327,7 @@ export function AccountModelsTab(props: {
       ) : null}
 
       {/* Paid: account / billing content */}
-      {isPaidMode ? (
-        <div className={s.paidAccountSection}>
-          <AccountTab />
-        </div>
-      ) : null}
+      {isPaidMode ? <AccountTab /> : null}
     </div>
   );
 }

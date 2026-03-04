@@ -122,7 +122,7 @@ export function InlineApiKey(props: {
 
   const handleSave = () => {
     if (!currentDraft.trim()) {
-      setValidationError("Please enter your token to continue");
+      setValidationError("Enter API key to continue");
     }
 
     if (authMode === "setup_token") {
