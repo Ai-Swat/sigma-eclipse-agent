@@ -25,6 +25,8 @@ import { useModelProvidersState } from "../providers/useModelProvidersState";
 import { AccountTab } from "../account/AccountTab";
 import { RichSelect, type RichOption } from "./RichSelect";
 import { InlineApiKey } from "./InlineApiKey";
+import { useAccountState } from "@ui/settings/account/useAccountState";
+
 import s from "./AccountModelsTab.module.css";
 
 type GatewayRpc = {
@@ -84,6 +86,7 @@ export function AccountModelsTab(props: {
   onError: (value: string | null) => void;
 }) {
   const dispatch = useAppDispatch();
+  const accountState = useAccountState();
   const authMode = useAppSelector((st) => st.auth.mode);
   const isPaidMode = authMode === "paid";
 
@@ -241,7 +244,7 @@ export function AccountModelsTab(props: {
         onSelect={handleConnectionSelect}
       />
 
-      {isPaidMode ? (
+      {isPaidMode && accountState.mode === "paid" && accountState.jwt && (
         <>
           <div className={s.dropdownGroup}>
             <div className={s.dropdownLabel}>Model</div>
@@ -259,7 +262,9 @@ export function AccountModelsTab(props: {
             </div>
           ) : null}
         </>
-      ) : (
+      )}
+
+      {!isPaidMode && (
         <>
           <div className={s.dropdownRow}>
             <div className={s.dropdownGroup}>
