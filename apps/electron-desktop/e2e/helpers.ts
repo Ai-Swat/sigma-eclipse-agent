@@ -544,6 +544,7 @@ export async function finishOnboarding(
 ): Promise<{ modelId: string }> {
   const result = await runOnboardingToConnections(page, creds);
   await skipConnections(page);
+  await page.waitForTimeout(700);
   await waitForChatPage(page);
   return result;
 }
