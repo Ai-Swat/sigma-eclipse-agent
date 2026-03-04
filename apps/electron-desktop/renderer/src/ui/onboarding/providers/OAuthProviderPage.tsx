@@ -133,7 +133,14 @@ export function OAuthProviderPage(props: {
         <div className="UiApiKeySpacer" aria-hidden="true" />
 
         <div className="UiApiKeyButtonRow">
-          <button className="UiTextButton" disabled={isBusy} onClick={props.onBack} type="button">
+          <button
+            className="UiTextButton"
+            onClick={() => {
+              abortRef.current = true;
+              props.onBack();
+            }}
+            type="button"
+          >
             Back
           </button>
           <PrimaryButton

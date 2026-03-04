@@ -354,6 +354,7 @@ export function usePaidOnboarding({ navigate }: PaidOnboardingInput) {
       busy: payBusy,
       error: payError,
       pending: paymentPending,
+      cancelPending: React.useCallback(() => setPaymentPending(false), []),
       onPay,
       subscriptionPrice,
       loadSubscriptionPrice,

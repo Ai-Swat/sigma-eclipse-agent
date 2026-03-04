@@ -36,6 +36,7 @@ export function SetupReviewPage(props: {
   subscriptionPrice: SubscriptionPriceInfo | null;
   onPay: () => void;
   onBack: () => void;
+  onCancelPayment?: () => void;
   busy?: boolean;
   paymentPending?: boolean;
   autoTopUp: AutoTopUpState;
@@ -62,6 +63,13 @@ export function SetupReviewPage(props: {
             <div className={s.UiSetupReviewPendingHint}>
               Complete the checkout in your browser, then return here.
             </div>
+            <button
+              className="UiTextButton"
+              type="button"
+              onClick={props.onCancelPayment ?? props.onBack}
+            >
+              Back
+            </button>
           </div>
         </GlassCard>
       </HeroPageLayout>

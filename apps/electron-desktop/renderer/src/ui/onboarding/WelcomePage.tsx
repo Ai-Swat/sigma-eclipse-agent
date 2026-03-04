@@ -168,6 +168,7 @@ export function WelcomePage({ state }: { state: Extract<GatewayState, { kind: "r
               subscriptionPrice={paid.pay.subscriptionPrice}
               onPay={() => void paid.pay.onPay()}
               onBack={paid.nav.goPaidModelSelect}
+              onCancelPayment={paid.pay.cancelPending}
               busy={paid.pay.busy}
               paymentPending={paid.pay.pending}
               autoTopUp={paid.billing.autoTopUp}
