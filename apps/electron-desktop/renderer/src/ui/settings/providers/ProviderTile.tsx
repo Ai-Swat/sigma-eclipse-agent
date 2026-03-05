@@ -55,7 +55,10 @@ export const ProviderTile = React.memo(function ProviderTile(props: {
           </button>
         )}
       </div>
-      <div className="UiSkillName">{provider.name}</div>
+      <div className="UiSkillName">
+        {provider.name}
+        {provider.privacyFirst && <span className="UiProviderBadgePrivacy">Privacy First</span>}
+      </div>
       <div className="UiSkillDescription">{provider.description}</div>
     </div>
   );

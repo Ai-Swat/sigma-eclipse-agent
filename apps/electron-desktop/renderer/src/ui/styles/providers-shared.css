@@ -196,6 +196,16 @@
   color: #f34eff;
 }
 
+.UiProviderBadgePrivacy {
+  opacity: 1;
+  border-radius: var(--radius-xs);
+  padding: 1px 4px;
+  background-color: #ffb30026;
+  font-weight: 400;
+  font-size: 13px;
+  color: #ffb300;
+}
+
 .UiProviderDescription {
   font-weight: 400;
   font-size: 13px;

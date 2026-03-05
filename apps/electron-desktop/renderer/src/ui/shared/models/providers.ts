@@ -20,6 +20,7 @@ export type ModelProviderInfo = {
   /** Placeholder text for the API key input. Not needed for OAuth providers. */
   placeholder?: string;
   popular?: boolean;
+  privacyFirst?: boolean;
   helpUrl?: string;
   helpTitle?: string;
   helpText?: string;
@@ -89,6 +90,15 @@ export const MODEL_PROVIDERS: ModelProviderInfo[] = [
     helpText: "Get your free API key from NVIDIA Build.",
   },
   {
+    id: "venice",
+    name: "Venice AI",
+    description: "Privacy-focused AI with uncensored models",
+    privacyFirst: true,
+    placeholder: "ven_...",
+    helpUrl: "https://venice.ai/settings/api",
+    helpText: "Get your API key from Venice AI Settings.",
+  },
+  {
     id: "google",
     name: "Google (Gemini)",
     description: "Strong with images, documents and large amounts of context",
@@ -121,14 +131,6 @@ export const MODEL_PROVIDERS: ModelProviderInfo[] = [
     placeholder: "sk-...",
     helpUrl: "https://www.kimi.com/code/en",
     helpText: "Get your API key from the Kimi Coding Platform.",
-  },
-  {
-    id: "venice",
-    name: "Venice AI",
-    description: "Privacy-focused AI with uncensored models",
-    placeholder: "ven_...",
-    helpUrl: "https://venice.ai/settings/api",
-    helpText: "Get your API key from Venice AI Settings.",
   },
   {
     id: "xai",

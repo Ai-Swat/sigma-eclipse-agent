@@ -47,6 +47,7 @@ function providerBadge(p: (typeof MODEL_PROVIDERS)[number]):
   | undefined {
   if (p.recommended) return { text: "Recommended", variant: "recommended" };
   if (p.popular) return { text: "Popular", variant: "popular" };
+  if (p.privacyFirst) return { text: "Privacy First", variant: "privacy" };
   return undefined;
 }
 

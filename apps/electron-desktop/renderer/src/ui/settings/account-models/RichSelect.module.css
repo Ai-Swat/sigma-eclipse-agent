@@ -262,6 +262,11 @@
   color: #34c759;
 }
 
+.optionBadge--privacy {
+  background: rgba(255, 179, 0, 0.15);
+  color: #ffb300;
+}
+
 .optionDescription {
   font-size: 10px;
   color: rgba(255, 255, 255, 0.4);

@@ -60,6 +60,9 @@ export function ProviderSelectPage(props: {
                   <span className="UiProviderName">{provider.name}</span>
                   {provider.recommended && <span className="UiProviderBadge">Recommended</span>}
                   {provider.popular && <span className="UiProviderBadgePopular">Popular</span>}
+                  {provider.privacyFirst && (
+                    <span className="UiProviderBadgePrivacy">Privacy First</span>
+                  )}
                 </div>
                 <div className="UiProviderDescription">{provider.description}</div>
               </div>
