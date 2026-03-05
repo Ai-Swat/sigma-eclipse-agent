@@ -57,8 +57,8 @@ export function SubscriptionPromoBannerSource() {
       id: BANNER_ID,
       variant: "info",
       icon: <SparkleIcon />,
-      title: "Forget your API keys",
-      subtitle: "Manage all models with one subscription",
+      title: "100+ AI Models. One Subscription.",
+      subtitle: "Access all major models with Atomic Bot.",
       action: { label: "Try now", onClick: () => void handleTryNow() },
       dismissible: "persistent",
     };
