@@ -11,7 +11,12 @@ export function LoadingScreen({ state: _state }: { state: GatewayState | null })
       <div className="UiLoadingStage" aria-live="polite">
         <div className="UiLoadingCenter">
           <SpinningSplashLogo iconAlt="Atomic Bot" />
-          <div className="UiLoadingTitle">Your Agent is Loading...</div>
+          <div>
+            <div className="UiLoadingTitle">Your Agent is Loading...</div>
+            <div className="UiLoadingSubtitle">
+              First launch may take up to 5 minutes. Please wait.
+            </div>
+          </div>
         </div>
         <FooterText>Version {appVersion}</FooterText>
       </div>
