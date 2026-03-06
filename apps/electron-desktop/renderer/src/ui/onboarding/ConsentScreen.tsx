@@ -58,15 +58,14 @@ export function ConsentScreen({
     >
       <div className={s.UiConsentStage}>
         <div className={s.UiConsentCenter}>
-          <SplashLogo iconAlt="Atomic Bot" />
+          <SplashLogo size={72} iconAlt="Atomic Bot" />
           <div className={s.UiConsentTitle}>Welcome to Atomic Bot</div>
-          <div className={s.UiConsentSubtitle}>
-            Get started by creating a new AI agent
-            <br />
-            or continue with an existing instance
-          </div>
 
-          <PrimaryButton disabled={busy} onClick={() => void acceptAndRun(onAccepted)}>
+          <PrimaryButton
+            className={s.UiConsentButton}
+            disabled={busy}
+            onClick={() => void acceptAndRun(onAccepted)}
+          >
             Create a new AI agent
           </PrimaryButton>
 
@@ -81,9 +80,7 @@ export function ConsentScreen({
 
           <div className="UiLinkContainer">
             <span>
-              Atomic Bot is an experimental product. By clicking
-              <br />
-              the button, you agree to our{" "}
+              By clicking the button, you agree to our{" "}
               <a
                 className="UiLink UiLinkMainPage"
                 href={termsUrl}

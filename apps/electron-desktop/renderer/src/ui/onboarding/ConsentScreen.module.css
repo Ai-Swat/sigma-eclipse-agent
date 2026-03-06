@@ -19,26 +19,23 @@
 
 .UiConsentTitle {
   font-weight: 700;
-  font-size: 26px;
+  font-size: 28px;
   line-height: 32px;
   user-select: none;
-  margin-bottom: 4px;
-}
-
-.UiConsentSubtitle {
-  font-weight: 400;
-  font-size: 13px;
-  line-height: 16px;
-  color: #a0a0a0;
   margin-bottom: 32px;
-  user-select: none;
+  margin-top: 16px;
 }
 
 .UiConsentCenter :global(.UiPrimaryButton) {
-  margin-top: 8px;
   width: 280px;
   min-width: 280px;
   box-sizing: border-box;
+  height: 48px;
+  padding: 13px 16px;
+  font-size: 17px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 22px;
 }
 
 .UiConsentSecondaryButton {
@@ -48,8 +45,9 @@
   width: 280px;
   min-width: 280px;
   box-sizing: border-box;
-  margin-top: 12px;
-  padding: 9px 14px;
+  margin-top: 8px;
+  height: 48px;
+  padding: 13px 16px;
   border: none;
   background: transparent;
   color: #ffffff;
