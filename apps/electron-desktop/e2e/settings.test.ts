@@ -137,7 +137,7 @@ test.describe("Settings page", () => {
     await page.waitForTimeout(500);
 
     const displayName = PROVIDER_DISPLAY_NAMES[secondCreds!.provider] ?? secondCreds!.provider;
-    const listbox = page.locator('[role="listbox"]');
+    const listbox = page.locator('[role="listbox"]').first();
     await expect(listbox).toBeVisible({ timeout: 5_000 });
     await listbox.getByText(displayName).click();
     await page.waitForTimeout(1_000);
