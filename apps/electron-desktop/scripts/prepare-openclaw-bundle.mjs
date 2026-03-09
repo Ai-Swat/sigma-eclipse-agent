@@ -474,6 +474,46 @@ async function main() {
     fs.renameSync(bundledPath, entryJs);
 
     if (process.platform === "win32") {
+      // Bundle extensions BEFORE tree-shaking .pnpm so extension-only deps
+      // (e.g. @pierre/diffs) are still resolvable during esbuild.  Once inlined
+      // into the extension bundle they can be safely pruned from node_modules.
+      const extensionsDir = path.join(outDir, "extensions");
+      if (fs.existsSync(extensionsDir)) {
+        const esbuildForExt = esbuild || (await import("esbuild"));
+        for (const extEntry of fs.readdirSync(extensionsDir, { withFileTypes: true })) {
+          if (!extEntry.isDirectory()) continue;
+          const extDir = path.join(extensionsDir, extEntry.name);
+          const extIndex = path.join(extDir, "index.ts");
+          if (!fs.existsSync(extIndex)) continue;
+          const bundledFile = path.join(extDir, "_bundled.js");
+          await esbuildForExt.build({
+            entryPoints: [extIndex],
+            bundle: true,
+            platform: "node",
+            format: "esm",
+            outfile: bundledFile,
+            logLimit: 0,
+            external: [
+              "openclaw/plugin-sdk",
+              "openclaw/plugin-sdk/*",
+              "../../../src/*",
+              "node:*",
+              ...effectiveExternals,
+            ],
+          });
+          for (const f of fs.readdirSync(extDir, { withFileTypes: true })) {
+            if (
+              f.name === "package.json" ||
+              f.name === "_bundled.js" ||
+              f.name === "openclaw.plugin.json"
+            )
+              continue;
+            fs.rmSync(path.join(extDir, f.name), { recursive: true, force: true });
+          }
+          fs.renameSync(bundledFile, extIndex);
+        }
+      }
+
       const pnpmStoreDir = path.join(nmDir, ".pnpm");
       if (fs.existsSync(pnpmStoreDir)) {
         const keepEntries = traceKeepEntries({ pnpmStoreDir, packageNames: [...externalPkgs] });
@@ -490,6 +530,10 @@ async function main() {
         removeDanglingLinks(pnpmStoreDir);
         deepHoistSubDependencies(pnpmStoreDir);
       }
+    } else {
+      console.log(
+        "[electron-desktop] Skipped extension rebundling and .pnpm pruning (macOS build)"
+      );
     }
 
     console.log(`[electron-desktop] ${externalPkgs.size} external packages kept`);
@@ -521,47 +565,6 @@ async function main() {
         "Then commit scripts/lib/openclaw-bundle-generated-externals.json",
       ].join("\n")
     );
-  }
-
-  if (process.platform === "win32") {
-    const extensionsDir = path.join(outDir, "extensions");
-    if (fs.existsSync(extensionsDir)) {
-      const esbuildForExt = esbuild || (await import("esbuild"));
-      for (const extEntry of fs.readdirSync(extensionsDir, { withFileTypes: true })) {
-        if (!extEntry.isDirectory()) continue;
-        const extDir = path.join(extensionsDir, extEntry.name);
-        const extIndex = path.join(extDir, "index.ts");
-        if (!fs.existsSync(extIndex)) continue;
-        const bundledFile = path.join(extDir, "_bundled.js");
-        await esbuildForExt.build({
-          entryPoints: [extIndex],
-          bundle: true,
-          platform: "node",
-          format: "esm",
-          outfile: bundledFile,
-          logLimit: 0,
-          external: [
-            "openclaw/plugin-sdk",
-            "openclaw/plugin-sdk/*",
-            "../../../src/*",
-            "node:*",
-            ...effectiveExternals,
-          ],
-        });
-        for (const f of fs.readdirSync(extDir, { withFileTypes: true })) {
-          if (
-            f.name === "package.json" ||
-            f.name === "_bundled.js" ||
-            f.name === "openclaw.plugin.json"
-          )
-            continue;
-          fs.rmSync(path.join(extDir, f.name), { recursive: true, force: true });
-        }
-        fs.renameSync(bundledFile, extIndex);
-      }
-    }
-  } else {
-    console.log("[electron-desktop] Skipped extension rebundling and .pnpm pruning (macOS build)");
   }
 
   // macOS codesign --verify --deep --strict rejects bundles with symlinks that

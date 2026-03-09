@@ -95,6 +95,11 @@
   "optionalDependencies": {
     "appdmg": "^0.6.6"
   },
+  "overrides": {
+    "@electron/osx-sign": {
+      "isbinaryfile": "^5.0.7"
+    }
+  },
   "dependencies": {
     "@mariozechner/pi-ai": "0.52.12",
     "electron-log": "^5.4.3",
