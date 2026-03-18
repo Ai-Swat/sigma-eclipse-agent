@@ -21,6 +21,7 @@ import {
   resolveRepoRoot,
 } from "../openclaw/paths";
 import { registerTerminalIpcHandlers } from "../terminal/ipc";
+import { installAgentNativeMessaging } from "../native-messaging/install";
 import { createTailBuffer, pickPort } from "../util/net";
 import { killUpdateSplash } from "../update-splash";
 import { initAutoUpdater } from "../updater";
@@ -103,6 +104,7 @@ export async function bootstrapApp(params: {
   params.ensureTray();
 
   killUpdateSplash();
+  installAgentNativeMessaging();
   if (app.isPackaged) {
     initAutoUpdater(() => params.state.mainWindow);
   }

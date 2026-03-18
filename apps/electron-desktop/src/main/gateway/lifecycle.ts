@@ -6,6 +6,7 @@ import type { TailBuffer } from "../util/net";
 import { IPC_EVENTS } from "../../shared/ipc-channels";
 import { spawnGateway } from "./spawn";
 import { writeGatewayPid, removeGatewayPid } from "./pid-file";
+import { writeGatewayInfoFile, removeGatewayInfoFile } from "./gateway-info-file";
 import { waitForPortOpen } from "../util/net";
 
 export function broadcastGatewayState(
@@ -14,6 +15,7 @@ export function broadcastGatewayState(
   state: AppState
 ): void {
   state.gatewayState = gwState;
+  writeGatewayInfoFile(gwState);
   try {
     win?.webContents.send(IPC_EVENTS.gatewayState, gwState);
   } catch (err) {
@@ -22,6 +24,7 @@ export function broadcastGatewayState(
 }
 
 export async function stopGatewayChild(state: AppState, platform: Platform): Promise<void> {
+  removeGatewayInfoFile();
   const pid = state.gatewayPid;
   state.gateway = null;
   if (!pid) {
@@ -139,6 +142,7 @@ export function createGatewayStarter(
         state.gateway = null;
         state.gatewayPid = null;
         removeGatewayPid(deps.stateDir);
+        removeGatewayInfoFile();
       }
     });
 

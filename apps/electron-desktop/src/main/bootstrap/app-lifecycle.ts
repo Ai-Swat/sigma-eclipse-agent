@@ -3,6 +3,7 @@ import * as path from "node:path";
 
 import type { AppState } from "../app-state";
 import type { Platform } from "../platform";
+import { removeGatewayInfoFile } from "../gateway/gateway-info-file";
 // sigma: Local LLM cleanup
 import { stopServerByPid } from "../sigma/services/server-manager";
 
@@ -70,6 +71,7 @@ export function registerAppLifecycle(params: {
   });
 
   process.on("exit", () => {
+    removeGatewayInfoFile();
     if (state.gatewayPid) {
       try {
         platform.killProcessTree(state.gatewayPid);
