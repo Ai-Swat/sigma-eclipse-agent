@@ -25,7 +25,7 @@ export function ConsentScreen({
 }) {
   const api = getDesktopApiOrNull() as ConsentDesktopApi | null;
   const [busy, setBusy] = React.useState(false);
-  const termsUrl = "https://atomicbot.ai/terms-of-service";
+  const termsUrl = "https://www.sigmabrowser.com/terms-of-use";
   const appVersion = pkg.version || "0.0.0";
 
   // Record TOS acceptance, then invoke the callback. Gateway is already

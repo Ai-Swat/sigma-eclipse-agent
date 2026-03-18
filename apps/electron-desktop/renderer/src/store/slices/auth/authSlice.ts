@@ -463,8 +463,8 @@ export const createAddonCheckout = createAsyncThunk(
 
     return backendApi.createAddonCheckout(jwt, {
       amountUsd: params.amountUsd,
-      successUrl: "atomicbot://addon-success",
-      cancelUrl: "atomicbot://addon-cancel",
+      successUrl: "sigmaeclipse://addon-success",
+      cancelUrl: "sigmaeclipse://addon-cancel",
     });
   }
 );

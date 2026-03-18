@@ -33,7 +33,13 @@
 .UiSectionCardGreen {
   background:
     linear-gradient(var(--bg-elevated), var(--bg-elevated)) padding-box,
-    linear-gradient(150deg, #c3ff4224 0%, rgba(255, 255, 255, 0) 50%, #c3ff4224 100%) border-box;
+    linear-gradient(
+        150deg,
+        rgba(0, 122, 255, 0.14) 0%,
+        rgba(255, 255, 255, 0) 50%,
+        rgba(0, 122, 255, 0.14) 100%
+      )
+      border-box;
 }
 
 .UiSectionTitle {

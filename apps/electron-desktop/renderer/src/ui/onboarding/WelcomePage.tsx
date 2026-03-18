@@ -1,14 +1,12 @@
 import React from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "@store/hooks";
-import { clearAuth } from "@store/slices/auth/authSlice";
+import { useAppSelector } from "@store/hooks";
 import type { GatewayState } from "@main/types";
 import { routes } from "../app/routes";
 import { GlassCard, HeroPageLayout, PrimaryButton } from "@shared/kit";
 import { addToastError } from "@shared/toast";
 import { ApiKeyPage } from "./providers/ApiKeyPage";
 import { OAuthProviderPage } from "./providers/OAuthProviderPage";
-import { SetupModePage } from "./providers/SetupModePage";
 import { ModelSelectPage } from "./providers/ModelSelectPage";
 import { ProviderSelectPage } from "./providers/ProviderSelectPage";
 import { SetupReviewPage } from "./SetupReviewPage";
@@ -59,7 +57,6 @@ function WelcomeAutoStart(props: {
 
 export function WelcomePage({ state }: { state: Extract<GatewayState, { kind: "ready" }> }) {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
   const onboarded = useAppSelector((s) => s.onboarding.onboarded);
   const welcome = useWelcomeState({ state, navigate });
   const paid = usePaidOnboarding({ navigate });
@@ -68,7 +65,7 @@ export function WelcomePage({ state }: { state: Extract<GatewayState, { kind: "r
 
   React.useEffect(() => {
     if (onboarded) {
-      void navigate(routes.consent, { replace: true });
+      void navigate(routes.settings, { replace: true });
     }
   }, [navigate, onboarded]);
 
@@ -112,34 +109,6 @@ export function WelcomePage({ state }: { state: Extract<GatewayState, { kind: "r
           }
         />
 
-        {/* ── Setup mode selection ── */}
-        <Route
-          path="setup-mode"
-          element={
-            <SetupModePage
-              totalSteps={PAID_FLOW.totalSteps}
-              activeStep={PAID_FLOW.steps.auth}
-              onSelect={(mode) => {
-                if (mode === "paid") {
-                  setFlow("paid");
-                  void paid.auth.startGoogleAuth();
-                } else {
-                  setFlow("self-managed");
-                  void dispatch(clearAuth());
-                  welcome.goProviderSelect();
-                }
-              }}
-              onStartGoogleAuth={() => {
-                setFlow("paid");
-                void paid.auth.startGoogleAuth();
-              }}
-              authBusy={paid.auth.busy}
-              authError={paid.auth.error}
-              onBack={() => void navigate(routes.consent)}
-            />
-          }
-        />
-
         {/* ── Paid-only routes ── */}
         <Route
           path="paid-model-select"
@@ -153,7 +122,7 @@ export function WelcomePage({ state }: { state: Extract<GatewayState, { kind: "r
               loading={paid.model.modelsLoading}
               error={paid.model.modelsError}
               onSelect={(modelId) => void paid.model.onSelect(modelId)}
-              onBack={paid.nav.goSetupMode}
+              onBack={() => void navigate(routes.consent)}
               onRetry={() => void paid.model.loadModels()}
             />
           }
@@ -191,7 +160,7 @@ export function WelcomePage({ state }: { state: Extract<GatewayState, { kind: "r
                 onStartChat={(key) => void paid.flow.onStartChat(key)}
               />
             ) : (
-              <Navigate to={`${routes.welcome}/setup-mode`} replace />
+              <Navigate to={`${routes.welcome}/provider-select`} replace />
             )
           }
         />

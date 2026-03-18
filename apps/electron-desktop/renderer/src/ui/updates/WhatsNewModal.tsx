@@ -8,8 +8,8 @@ import s from "./WhatsNewModal.module.css";
 
 const STORAGE_KEY = "whatsNew_lastVersion";
 const LAUNCHED_KEY = "openclaw.desktop.launched";
-const GITHUB_OWNER = "AtomicBot-ai";
-const GITHUB_REPO = "atomicbot";
+const GITHUB_OWNER = "sigmaeclipse";
+const GITHUB_REPO = "sigma-eclipse";
 
 type WhatsNewState =
   | { kind: "idle" }

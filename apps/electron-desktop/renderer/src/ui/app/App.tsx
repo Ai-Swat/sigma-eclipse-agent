@@ -69,6 +69,18 @@ function SidebarLayout({ state }: { state: Extract<GatewayState, { kind: "ready"
   );
 }
 
+function SettingsLayout({ state }: { state: Extract<GatewayState, { kind: "ready" }> }) {
+  return (
+    <GatewayRpcProvider url={state.url} token={state.token}>
+      <div className={a.UiAppShell}>
+        <div className={a.UiAppPage}>
+          <Outlet />
+        </div>
+      </div>
+    </GatewayRpcProvider>
+  );
+}
+
 function Topbar() {
   const brandIconUrl = React.useMemo(() => {
     // Renderer lives at renderer/dist/index.html; the app's assets are at ../../assets/
@@ -92,7 +104,7 @@ function Topbar() {
           >
             <path
               d="M8.26389 14C8.53236 14 8.74764 13.7817 8.77217 13.5143C9.00258 11.0024 11.0024 9.00258 13.5143 8.77217C13.7817 8.74764 14 8.53236 14 8.26389L14 5.73611C14 5.46764 13.7824 5.25 13.5139 5.25L9.23611 5.25C8.96764 5.25 8.75 5.03236 8.75 4.76389L8.75 0.486109C8.75 0.217638 8.53236 -1.42935e-06 8.26389 -1.40588e-06L5.73611 -1.1849e-06C5.46764 -1.16143e-06 5.25236 0.218344 5.22783 0.485694C4.99742 2.99757 2.99757 4.99742 0.485695 5.22783C0.218345 5.25235 -7.45923e-07 5.46764 -7.22452e-07 5.73611L-5.01467e-07 8.26389C-4.77996e-07 8.53236 0.217639 8.75 0.486111 8.75L4.76389 8.75C5.03236 8.75 5.25 8.96764 5.25 9.23611L5.25 13.5139C5.25 13.7824 5.46764 14 5.73611 14L8.26389 14Z"
-              fill="#121212"
+              fill="#ffffff"
             />
           </svg>
           <span>Back to Sigma Eclipse</span>
@@ -203,7 +215,7 @@ export function App() {
               onboarded={onboarded}
               onAccepted={() => {
                 if (onboarded) {
-                  void navigate(routes.chat, { replace: true });
+                  void navigate(routes.settings, { replace: true });
                 } else {
                   void navigate(routes.welcome, { replace: true });
                 }
@@ -223,11 +235,8 @@ export function App() {
             </GatewayRpcProvider>
           }
         />
-        <Route path="/" element={<SidebarLayout state={state} />}>
-          <Route index element={<Navigate to={routes.chat} replace />} />
-          <Route path="chat" element={<ChatRoute state={state} />} />
-          <Route path="terminal" element={<TerminalPage />} />
-          <Route path={routes.settings} element={<SettingsPage state={state} />}>
+        <Route path={routes.settings} element={<SettingsLayout state={state} />}>
+          <Route element={<SettingsPage state={state} />}>
             <Route index element={<SettingsIndexRedirect />} />
             <Route path="account-models" element={<SettingsTab tab="account-models" />} />
             <Route path="ai-models" element={<SettingsTab tab="model" />} />
@@ -235,9 +244,13 @@ export function App() {
             <Route path="messengers" element={<SettingsTab tab="connectors" />} />
             <Route path="skills" element={<SettingsTab tab="skills-integrations" />} />
             <Route path="voice" element={<SettingsTab tab="voice" />} />
-            <Route path="account" element={<SettingsTab tab="account" />} />
             <Route path="other" element={<SettingsTab tab="other" />} />
           </Route>
+        </Route>
+        <Route path="/" element={<SidebarLayout state={state} />}>
+          <Route index element={<Navigate to={routes.settings} replace />} />
+          <Route path="chat" element={<ChatRoute state={state} />} />
+          <Route path="terminal" element={<TerminalPage />} />
         </Route>
         <Route
           path="*"

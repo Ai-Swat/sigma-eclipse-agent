@@ -16,14 +16,14 @@ describe("backup dialog adapter", () => {
 
   it("builds deterministic backup filename", () => {
     const file = buildBackupDefaultFileName(new Date(2026, 2, 2, 8, 9, 7));
-    expect(file).toBe("atomicbot-backup-2026-03-02-080907.zip");
+    expect(file).toBe("sigma-eclipse-backup-2026-03-02-080907.zip");
   });
 
   it("opens save dialog with default backup path", async () => {
     await showBackupSaveDialog(null);
     expect(dialog.showSaveDialog).toHaveBeenCalledTimes(1);
     const options = vi.mocked(dialog.showSaveDialog).mock.calls[0]?.[0] as { defaultPath: string };
-    expect(options.defaultPath).toContain("/mock/documents/atomicbot-backup-");
+    expect(options.defaultPath).toContain("/mock/documents/sigma-eclipse-backup-");
     expect(options.defaultPath.endsWith(".zip")).toBe(true);
   });
 

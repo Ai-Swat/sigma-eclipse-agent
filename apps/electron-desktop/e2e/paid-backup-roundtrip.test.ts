@@ -120,11 +120,11 @@ test.describe("Paid backup roundtrip (paid -> self -> paid)", () => {
     expect(token).toBeNull();
   });
 
-  test("switch back to Atomic Bot Account restores paid state", async () => {
+  test("switch back to Sigma Eclipse Account restores paid state", async () => {
     test.setTimeout(30_000);
 
     const toggle = page.locator('[aria-label="Connection mode"]');
-    await toggle.getByText("Atomic Bot Account").click();
+    await toggle.getByText("Sigma Eclipse Account").click();
     await page.waitForTimeout(3_000);
 
     const token = await page.evaluate((key) => localStorage.getItem(key), AUTH_TOKEN_LS_KEY);

@@ -12,7 +12,7 @@ function makeFakeWindow(destroyed = false) {
 
 describe("parseDeepLinkUrl", () => {
   it("parses a valid deep link URL", () => {
-    const result = parseDeepLinkUrl("atomicbot://callback?code=abc&state=xyz");
+    const result = parseDeepLinkUrl("sigmaeclipse://callback?code=abc&state=xyz");
     expect(result).toEqual({
       host: "callback",
       pathname: "",
@@ -21,7 +21,7 @@ describe("parseDeepLinkUrl", () => {
   });
 
   it("parses URL with pathname", () => {
-    const result = parseDeepLinkUrl("atomicbot://auth/callback?token=123");
+    const result = parseDeepLinkUrl("sigmaeclipse://auth/callback?token=123");
     expect(result).toEqual({
       host: "auth",
       pathname: "/callback",
@@ -30,7 +30,7 @@ describe("parseDeepLinkUrl", () => {
   });
 
   it("parses URL with no query params", () => {
-    const result = parseDeepLinkUrl("atomicbot://open");
+    const result = parseDeepLinkUrl("sigmaeclipse://open");
     expect(result).toEqual({ host: "open", pathname: "", params: {} });
   });
 
@@ -42,7 +42,7 @@ describe("parseDeepLinkUrl", () => {
 describe("handleDeepLink", () => {
   it("sends parsed deep link data to the window", () => {
     const win = makeFakeWindow();
-    handleDeepLink("atomicbot://callback?code=abc&state=xyz", win);
+    handleDeepLink("sigmaeclipse://callback?code=abc&state=xyz", win);
     expect(win.webContents.send).toHaveBeenCalledWith("deep-link", {
       host: "callback",
       pathname: "",
@@ -51,12 +51,12 @@ describe("handleDeepLink", () => {
   });
 
   it("does nothing when window is null", () => {
-    expect(() => handleDeepLink("atomicbot://callback?code=abc", null)).not.toThrow();
+    expect(() => handleDeepLink("sigmaeclipse://callback?code=abc", null)).not.toThrow();
   });
 
   it("does nothing when window is destroyed", () => {
     const win = makeFakeWindow(true);
-    handleDeepLink("atomicbot://callback?code=abc", win);
+    handleDeepLink("sigmaeclipse://callback?code=abc", win);
     expect(win.webContents.send).not.toHaveBeenCalled();
   });
 

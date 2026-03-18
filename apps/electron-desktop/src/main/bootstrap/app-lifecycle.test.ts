@@ -19,17 +19,17 @@ describe("registerProtocolHandler", () => {
 
   it("registers protocol for packaged app", () => {
     (process as { defaultApp?: boolean }).defaultApp = false;
-    registerProtocolHandler("atomicbot");
-    expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith("atomicbot");
+    registerProtocolHandler("sigmaeclipse");
+    expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith("sigmaeclipse");
   });
 
   it("registers protocol with argv for default app", () => {
     (process as { defaultApp?: boolean }).defaultApp = true;
     process.argv = ["/usr/bin/node", "./src/main.ts"];
-    registerProtocolHandler("atomicbot");
+    registerProtocolHandler("sigmaeclipse");
     expect(app.setAsDefaultProtocolClient).toHaveBeenCalledTimes(1);
     const args = vi.mocked(app.setAsDefaultProtocolClient).mock.calls[0];
-    expect(args?.[0]).toBe("atomicbot");
+    expect(args?.[0]).toBe("sigmaeclipse");
     expect(args?.[1]).toBe(process.execPath);
     expect(Array.isArray(args?.[2])).toBe(true);
   });
@@ -45,7 +45,7 @@ describe("registerAppLifecycle", () => {
   it("returns false and quits when single-instance lock fails", () => {
     vi.mocked(app.requestSingleInstanceLock).mockReturnValue(false);
     const ok = registerAppLifecycle({
-      protocol: "atomicbot",
+      protocol: "sigmaeclipse",
       state: createAppState(),
       platform: {
         keepAliveOnAllWindowsClosed: false,
@@ -79,7 +79,7 @@ describe("registerAppLifecycle", () => {
     const killProcessTree = vi.fn();
 
     const ok = registerAppLifecycle({
-      protocol: "atomicbot",
+      protocol: "sigmaeclipse",
       state,
       platform: {
         keepAliveOnAllWindowsClosed: false,
@@ -93,7 +93,7 @@ describe("registerAppLifecycle", () => {
     });
 
     expect(ok).toBe(true);
-    handlers.get("second-instance")?.({}, ["atomicbot://foo"]);
+    handlers.get("second-instance")?.({}, ["sigmaeclipse://foo"]);
     expect(handleDeepLink).toHaveBeenCalled();
     expect(showWindow).toHaveBeenCalled();
 

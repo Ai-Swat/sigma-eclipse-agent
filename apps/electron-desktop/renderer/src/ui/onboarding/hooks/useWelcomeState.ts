@@ -57,17 +57,12 @@ export function useWelcomeState({ state, navigate }: WelcomeStateInput) {
 
   const nav = useWelcomeNavigation(navigate);
 
-  const goSetupMode = React.useCallback(() => {
-    void navigate(`${routes.welcome}/setup-mode`);
-  }, [navigate]);
-
   const config = useWelcomeConfig({
     gw,
     state,
     setError,
     setStatus,
     goProviderSelect: nav.goProviderSelect,
-    goSetupMode,
   });
   const { loadConfig, refreshProviderFlags } = config;
 
@@ -142,7 +137,7 @@ export function useWelcomeState({ state, navigate }: WelcomeStateInput) {
     dispatch(authActions.setMode("self-managed"));
     persistDesktopMode("self-managed");
     void dispatch(setOnboarded(true));
-    void navigate(routes.chat, { replace: true });
+    void navigate(routes.settings, { replace: true });
   }, [dispatch, navigate]);
 
   const goMediaUnderstanding = React.useCallback(() => {

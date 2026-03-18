@@ -7,7 +7,7 @@ const BACKEND_URL =
   (typeof window !== "undefined" &&
     (window as unknown as Record<string, unknown>).__BACKEND_URL__) ||
   import.meta.env.VITE_BACKEND_URL ||
-  "https://api.atomicbot.ai";
+  "https://api.sigmaeclipse.ai";
 
 export type DeploymentInfo = {
   id: string;

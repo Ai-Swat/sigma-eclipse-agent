@@ -113,7 +113,7 @@ test.describe("Settings account tab (paid mode)", () => {
     await expect(tabNav.getByText("AI Models")).toBeVisible();
   });
 
-  test("Connection toggle shows Atomic Bot Account as active", async () => {
+  test("Connection toggle shows Sigma Eclipse Account as active", async () => {
     test.setTimeout(15_000);
     const tabNav = page.locator('[aria-label="Settings sections"]');
     await tabNav.getByText("AI Models").click();
@@ -121,7 +121,7 @@ test.describe("Settings account tab (paid mode)", () => {
 
     const toggle = page.locator('[aria-label="Connection mode"]');
     await expect(toggle).toBeVisible({ timeout: 10_000 });
-    await expect(toggle.getByText("Atomic Bot Account")).toBeVisible();
+    await expect(toggle.getByText("Sigma Eclipse Account")).toBeVisible();
     await expect(toggle.getByText("Own API key")).toBeVisible();
   });
 
@@ -135,7 +135,7 @@ test.describe("Settings account tab (paid mode)", () => {
       .isVisible()
       .catch(() => false);
     const hasSubscribe = await page
-      .getByText("Atomic Bot Subscription")
+      .getByText("Sigma Eclipse Subscription")
       .isVisible()
       .catch(() => false);
     const hasContinueGoogle = await page

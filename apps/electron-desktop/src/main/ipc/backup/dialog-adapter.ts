@@ -12,7 +12,7 @@ export function buildBackupDefaultFileName(now = new Date()): string {
     String(now.getMinutes()).padStart(2, "0"),
     String(now.getSeconds()).padStart(2, "0"),
   ].join("");
-  return `atomicbot-backup-${datePart}-${timePart}.zip`;
+  return `sigma-eclipse-backup-${datePart}-${timePart}.zip`;
 }
 
 export async function showBackupSaveDialog(parentWindow: BrowserWindow | null) {

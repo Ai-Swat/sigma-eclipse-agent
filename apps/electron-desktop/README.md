@@ -1,6 +1,6 @@
-# Atomic Bot Desktop
+# Sigma Eclipse Desktop
 
-Cross-platform Electron desktop app for [Atomic Bot](https://atomicbot.ai) — an AI assistant that makes things for you.
+Cross-platform Electron desktop app for [Sigma Eclipse](https://www.sigmabrowser.com) — an AI assistant that makes things for you.
 
 **Platforms:** macOS (arm64 / x64) · Windows (x64)
 

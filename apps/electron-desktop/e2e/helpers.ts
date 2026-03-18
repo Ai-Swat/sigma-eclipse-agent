@@ -13,7 +13,7 @@ export type AppContext = {
 };
 
 export async function launchApp(): Promise<AppContext> {
-  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "atomicbot-e2e-"));
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "sigma-eclipse-e2e-"));
 
   const app = await electron.launch({
     args: [MAIN_ENTRY],
@@ -22,7 +22,7 @@ export async function launchApp(): Promise<AppContext> {
       ...process.env,
       NODE_ENV: "test",
       ELECTRON_RUN_AS_NODE: "",
-      ATOMICBOT_E2E_USER_DATA: userDataDir,
+      SIGMAECLIPSE_E2E_USER_DATA: userDataDir,
     },
   });
 

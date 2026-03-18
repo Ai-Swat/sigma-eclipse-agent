@@ -117,7 +117,7 @@
   white-space: nowrap;
   flex-shrink: 0;
   background: var(--lime);
-  color: var(--surface-primary);
+  color: #fff;
   transition: opacity 150ms ease;
 }
 

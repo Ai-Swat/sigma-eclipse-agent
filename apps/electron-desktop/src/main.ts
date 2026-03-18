@@ -15,14 +15,14 @@ import { ensureMainWindow, showMainWindow } from "./main/window/window-manager";
 // Trigger platform init (e.g. spawn patching on Windows) as early as possible.
 const platform = getPlatform();
 
-if (process.env.ATOMICBOT_E2E_USER_DATA) {
-  app.setPath("userData", process.env.ATOMICBOT_E2E_USER_DATA);
+if (process.env.SIGMAECLIPSE_E2E_USER_DATA) {
+  app.setPath("userData", process.env.SIGMAECLIPSE_E2E_USER_DATA);
 }
 
 initLogger();
 
 const MAIN_DIR = __dirname;
-const DEEP_LINK_PROTOCOL = "atomicbot";
+const DEEP_LINK_PROTOCOL = "sigmaeclipse";
 
 registerProtocolHandler(DEEP_LINK_PROTOCOL);
 

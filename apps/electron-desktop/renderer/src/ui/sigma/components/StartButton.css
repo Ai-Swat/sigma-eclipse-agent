@@ -16,7 +16,7 @@
 .start-button .background {
   background: var(--lime);
   border-radius: 50%;
-  box-shadow: 0 4px 20px rgba(79, 195, 247, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 122, 255, 0.3);
   cursor: pointer;
   height: var(--start-button-size);
   position: absolute;
@@ -28,12 +28,12 @@
 
 .start-button:hover .background {
   background: var(--lime-soft);
-  box-shadow: 0 4px 28px rgba(79, 195, 247, 0.45);
+  box-shadow: 0 4px 28px rgba(0, 122, 255, 0.45);
 }
 
 .start-button:active .background {
   background: var(--lime);
-  box-shadow: 0 2px 12px rgba(79, 195, 247, 0.25);
+  box-shadow: 0 2px 12px rgba(0, 122, 255, 0.25);
 }
 
 .start-button.active .background {

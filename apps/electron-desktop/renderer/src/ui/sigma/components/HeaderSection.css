@@ -20,7 +20,7 @@
 .sigma-header-logo {
   border-radius: var(--radius-sm);
   object-fit: contain;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 8px rgba(79, 195, 247, 0.2));
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 8px rgba(0, 122, 255, 0.2));
 }
 
 .sigma-header-title {

@@ -102,11 +102,11 @@ function SignUpPrompt(props: { onContinueWithGoogle: () => void }) {
     <div className={s.root}>
       <div className={s.signUpCard}>
         <div className={s.signUpIcon}>
-          <SplashLogo iconAlt="Atomic Bot" size={28} />
+          <SplashLogo iconAlt="Sigma Eclipse" size={28} />
         </div>
 
         <div className={s.signUpBody}>
-          <h3 className={s.signUpTitle}>Atomic Bot Subscription</h3>
+          <h3 className={s.signUpTitle}>Sigma Eclipse Subscription</h3>
           <p className={s.signUpHint}>
             No API keys needed · Auto credit management · Billed monthly
           </p>
@@ -150,10 +150,10 @@ function SubscribePrompt(props: {
       <div className={s.promoCard}>
         <div className={s.promoHeader}>
           <div className={s.promoIconWrap}>
-            <SplashLogo iconAlt="Atomic Bot" size={24} />
+            <SplashLogo iconAlt="Sigma Eclipse" size={24} />
           </div>
           <div>
-            <h3 className={s.promoTitle}>Atomic Bot Subscription</h3>
+            <h3 className={s.promoTitle}>Sigma Eclipse Subscription</h3>
             <span className={s.promoPrice}>{formatSubscriptionPrice(props.subscriptionPrice)}</span>
           </div>
         </div>

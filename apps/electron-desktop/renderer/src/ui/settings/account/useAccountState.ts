@@ -193,7 +193,7 @@ export function useAccountState() {
   }, [dispatch, gw.request]);
 
   const handleContinueWithGoogle = React.useCallback(() => {
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://api.atomicbot.ai";
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://api.sigmaeclipse.ai";
     const url = `${backendUrl}/auth/google/desktop`;
     openExternal(url);
   }, []);

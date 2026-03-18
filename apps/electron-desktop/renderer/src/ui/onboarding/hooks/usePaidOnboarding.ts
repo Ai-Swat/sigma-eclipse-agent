@@ -43,7 +43,7 @@ import { useWelcomeTelegram } from "./useWelcomeTelegram";
 import { useWelcomeGog } from "./useWelcomeGog";
 import { useWelcomeApiKey } from "./useWelcomeApiKey";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://api.atomicbot.ai";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://api.sigmaeclipse.ai";
 type BackendKeys = { openrouterApiKey: string | null; openaiApiKey: string | null };
 
 type PaidOnboardingInput = {
@@ -218,7 +218,7 @@ export function usePaidOnboarding({ navigate }: PaidOnboardingInput) {
       persistDesktopMode("paid");
       void dispatch(setOnboarded(true));
       void dispatch(fetchDesktopStatus());
-      void navigate(routes.chat, { replace: true });
+      void navigate(routes.settings, { replace: true });
     },
     [dispatch, gw, config.loadConfig, navigate]
   );
@@ -370,7 +370,6 @@ export function usePaidOnboarding({ navigate }: PaidOnboardingInput) {
     },
     billing: { autoTopUp, autoTopUpLoading, autoTopUpSaving, autoTopUpError, onAutoTopUpPatch },
     nav: {
-      goSetupMode: nav.goSetupMode,
       goPaidModelSelect: nav.goPaidModelSelect,
       goSetupReview: nav.goSetupReview,
       goSuccess: nav.goSuccess,

@@ -59,7 +59,7 @@ export function RestoreFilePage(props: { totalSteps: number; activeStep: number 
         dispatch(authActions.setMode(restoredMode));
         persistMode(restoredMode);
         void dispatch(setOnboarded(true));
-        void navigate(routes.chat, { replace: true });
+        void navigate(routes.settings, { replace: true });
       } catch (err) {
         setError(errorToMessage(err));
         setPageState("error");

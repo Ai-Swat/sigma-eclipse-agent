@@ -3,46 +3,55 @@
 .UiSetupModeCard {
   display: flex;
   flex-direction: column;
-  max-width: 640px;
+  width: min(566px, 90vw);
 }
 
-.UiSetupModeOptions {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 16px;
-  height: 100%;
-}
-
-.UiSetupModeOption {
+.UiSetupModeCard :global(.UiSectionContent) {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  padding: 20px;
-  border-radius: var(--radius-lg);
-  background: var(--surface-hover);
-  border: 1.5px solid var(--surface-overlay);
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
-  text-align: left;
-  color: inherit;
-  font-family: inherit;
-  font-size: inherit;
+  gap: 20px;
 }
 
-.UiSetupModeOptionSelected {
-  border-color: var(--lime);
-  background: var(--surface-overlay-subtle);
-}
+/* ── Full-width panel (single option) ── */
 
-.UiSetupModeIconRow {
+.UiSetupModePanel {
   display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+  padding: 24px;
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(var(--bg-elevated), var(--bg-elevated)) padding-box,
+    linear-gradient(
+        150deg,
+        rgba(255, 255, 255, 0.24) 0%,
+        rgba(255, 255, 255, 0) 50%,
+        rgba(255, 255, 255, 0.24) 100%
+      )
+      border-box;
+  border: 1px solid transparent;
 }
+
+.UiSetupModePanelBody {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex: 1;
+}
+
+.UiSetupModePanelInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.UiSetupModePanel :global(.UiSecondaryButton) {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* ── Icon ── */
 
 .UiSetupModeIcon {
   display: flex;
@@ -53,11 +62,6 @@
   border-radius: 12px;
   background: var(--surface-overlay);
   flex-shrink: 0;
-  margin-bottom: 12px;
-}
-
-.UiSetupModeIconRow .UiSetupModeIcon {
-  margin-bottom: 0;
 }
 
 .UiSetupModeIcon img {
@@ -66,39 +70,28 @@
   object-fit: contain;
 }
 
-.UiSetupModeBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
+/* ── Text ── */
 
 .UiSetupModeTitle {
   font-weight: 700;
   font-size: 17px;
   line-height: 22px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .UiSetupModeDesc {
   font-size: 13px;
   color: var(--muted3);
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 .UiSetupModeFeatures {
   list-style: none;
   padding: 0;
-  margin: 0 0 16px 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  flex: 1;
+  gap: 8px;
 }
 
 .UiSetupModeFeatures li {
@@ -117,9 +110,11 @@
   flex-shrink: 0;
 }
 
-.UiSetupModeOption :global(.UiPrimaryButton),
-.UiSetupModeOption :global(.UiSecondaryButton) {
-  width: 100%;
+/* ── Back button ── */
+
+.UiBackButton {
+  align-self: center;
+  flex-shrink: 0;
   margin-top: auto;
 }
 

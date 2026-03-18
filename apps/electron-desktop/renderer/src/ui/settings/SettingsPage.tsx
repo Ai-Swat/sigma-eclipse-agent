@@ -1,11 +1,12 @@
 import React from "react";
-import { Navigate, NavLink, Outlet, useOutletContext } from "react-router-dom";
+import { Navigate, NavLink, Outlet, useNavigate, useOutletContext } from "react-router-dom";
 import { useGatewayRpc } from "@gateway/context";
 import { useAppDispatch, useAppSelector } from "@store/hooks";
 import { configActions, reloadConfig, type ConfigSnapshot } from "@store/slices/configSlice";
 import type { SetupMode } from "@store/slices/auth/authSlice";
 import type { GatewayState } from "@main/types";
 import { HeroPageLayout } from "@shared/kit";
+import { routes } from "../app/routes";
 import s from "./SettingsPage.module.css";
 export { s as settingsStyles };
 import { ConnectorsTab } from "./connectors/ConnectorsTab";
@@ -13,7 +14,6 @@ import { ModelProvidersTab } from "./providers/ModelProvidersTab";
 import { OtherTab } from "./OtherTab";
 import { SkillsIntegrationsTab } from "./skills/SkillsIntegrationsTab";
 import { VoiceRecognitionTab } from "./voice/VoiceRecognitionTab";
-import { AccountTab } from "./account/AccountTab";
 import { AccountModelsTab } from "./account-models/AccountModelsTab";
 import { addToastError } from "@shared/toast";
 
@@ -31,14 +31,12 @@ export type SettingsTabId =
   | "skills-integrations"
   | "connectors"
   | "voice"
-  | "account"
   | "account-models"
   | "other";
 
 type TabDef = { path: string; label: string; tab: SettingsTabId };
 
 const ALL_TABS: TabDef[] = [
-  { path: "account", label: "Account", tab: "account" },
   { path: "skills", label: "Skills", tab: "skills-integrations" },
   { path: "account-models", label: "AI Models", tab: "account-models" },
   { path: "ai-models", label: "AI Models", tab: "model" },
@@ -49,7 +47,7 @@ const ALL_TABS: TabDef[] = [
 ];
 
 function getVisibleTabs(_mode: SetupMode | null): TabDef[] {
-  return ALL_TABS.filter((t) => t.tab !== "account" && t.tab !== "model" && t.tab !== "providers");
+  return ALL_TABS.filter((t) => t.tab !== "model" && t.tab !== "providers");
 }
 
 function SettingsTabItem({ to, children }: { to: string; children: React.ReactNode }) {
@@ -126,8 +124,6 @@ export function SettingsTab({ tab }: { tab: SettingsTabId }) {
           onError={ctx.onError}
         />
       );
-    case "account":
-      return <AccountTab />;
     case "account-models":
       return (
         <AccountModelsTab
@@ -145,6 +141,7 @@ export function SettingsTab({ tab }: { tab: SettingsTabId }) {
 }
 
 export function SettingsPage({ state }: { state: Extract<GatewayState, { kind: "ready" }> }) {
+  const navigate = useNavigate();
   const [pageError, setPageError] = React.useState<string | null>(null);
   const dispatch = useAppDispatch();
   const configSnap = useAppSelector((st) => st.config.snap);
@@ -189,7 +186,16 @@ export function SettingsPage({ state }: { state: Extract<GatewayState, { kind: "
     >
       <div className={s.UiSettingsShellWrapper}>
         <div className={s.UiSettingsHeader}>
-          <h1 className={s.UiSettingsTitle}>Settings</h1>
+          <div className={s.UiSettingsTitleRow}>
+            <h1 className={s.UiSettingsTitle}>Settings</h1>
+            <button
+              type="button"
+              className={s.UiSettingsBackButton}
+              onClick={() => void navigate(routes.consent, { replace: true })}
+            >
+              ← Back to home
+            </button>
+          </div>
           <nav className={s.UiSettingsTabs} aria-label="Settings sections">
             {visibleTabs.map(({ path, label }) => (
               <SettingsTabItem key={path} to={path}>

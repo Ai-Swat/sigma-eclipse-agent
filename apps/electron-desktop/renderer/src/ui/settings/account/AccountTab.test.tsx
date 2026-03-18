@@ -256,7 +256,7 @@ describe("AccountTab logout confirmation", () => {
 
     render(<AccountTab />);
     await waitFor(() => {
-      expect(screen.getByText("Atomic Bot Subscription")).not.toBeNull();
+      expect(screen.getByText("Sigma Eclipse Subscription")).not.toBeNull();
       expect(screen.getByText(/Subscribe \$/)).not.toBeNull();
     });
 

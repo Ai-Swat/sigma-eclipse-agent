@@ -7,7 +7,7 @@ import * as path from "node:path";
 import type { Platform } from "./types";
 
 const SENTINEL_FILENAME = "update-splash.pid";
-const TEMP_SCRIPT_NAME = "atomicbot-update-splash.js";
+const TEMP_SCRIPT_NAME = "sigma-eclipse-update-splash.js";
 
 // JXA script (JavaScript for Automation) that renders a native macOS window.
 // Runs via `osascript -l JavaScript <file> <oldPid> <sentinelPath> <bundleId>`.
@@ -15,7 +15,7 @@ const JXA_SCRIPT = /* js */ `
 function run(argv) {
   var oldPid = parseInt(argv[0], 10) || 0;
   var sentinelPath = argv[1] || '';
-  var bundleId = argv[2] || 'ai.atomicbot.desktop';
+  var bundleId = argv[2] || 'ai.sigmaeclipse.desktop';
 
   ObjC.import('Cocoa');
 

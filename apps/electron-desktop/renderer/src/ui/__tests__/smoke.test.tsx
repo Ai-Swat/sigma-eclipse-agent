@@ -153,7 +153,7 @@ describe("Smoke render tests", () => {
       </TestShell>
     );
     expect(screen.getByRole("dialog", { name: /user agreement/i })).toBeTruthy();
-    expect(screen.getByText(/Welcome to Atomic Bot/i)).toBeTruthy();
+    expect(screen.getByText(/Welcome to Sigma Eclipse/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: /create a new ai agent/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /import an existing setup/i })).toBeTruthy();
   });

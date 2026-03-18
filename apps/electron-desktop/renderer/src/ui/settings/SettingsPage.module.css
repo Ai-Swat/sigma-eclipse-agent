@@ -23,6 +23,13 @@
   z-index: 100;
 }
 
+.UiSettingsTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
 .UiSettingsTitle {
   color: #fff;
   font-size: 26px;
@@ -30,7 +37,28 @@
   font-weight: 700;
   line-height: 32px;
   letter-spacing: -0.26px;
-  margin: 0 0 16px;
+  margin: 0;
+}
+
+.UiSettingsBackButton {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 6px 12px;
+  color: rgba(230, 237, 243, 0.55);
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.UiSettingsBackButton:hover {
+  color: rgba(230, 237, 243, 0.9);
+  background: rgba(230, 237, 243, 0.06);
 }
 
 /* Top-level horizontal tab bar (AI Models, AI Providers, …) */

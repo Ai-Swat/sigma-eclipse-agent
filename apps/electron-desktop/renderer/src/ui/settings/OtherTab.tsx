@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { getDesktopApiOrNull } from "@ipc/desktopApi";
 import { useGatewayRpc } from "@gateway/context";
@@ -11,7 +11,6 @@ import { ConfirmDialog } from "@shared/kit";
 import { routes } from "../app/routes";
 import { settingsStyles as ps } from "./SettingsPage";
 import { openExternal } from "@shared/utils/openExternal";
-import { useTerminalSidebarVisible } from "@shared/hooks/useTerminalSidebarVisible";
 import { RestoreBackupModal } from "./RestoreBackupModal";
 import s from "./OtherTab.module.css";
 import pkg from "../../../../package.json";
@@ -20,7 +19,6 @@ export function OtherTab({ onError }: { onError: (msg: string | null) => void })
   const [launchAtStartup, setLaunchAtStartup] = React.useState(false);
   const [resetBusy, setResetBusy] = React.useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = React.useState(false);
-  const [terminalSidebar, setTerminalSidebar] = useTerminalSidebarVisible();
   const [backupBusy, setBackupBusy] = React.useState(false);
   const [restoreModalOpen, setRestoreModalOpen] = React.useState(false);
   const navigate = useNavigate();
@@ -123,7 +121,7 @@ export function OtherTab({ onError }: { onError: (msg: string | null) => void })
         <div className={s.UiSettingsOtherCard}>
           <div className={s.UiSettingsOtherRow}>
             <span className={s.UiSettingsOtherRowLabel}>Version</span>
-            <span className={s.UiSettingsOtherAppRowValue}>Atomic Bot v{appVersion}</span>
+            <span className={s.UiSettingsOtherAppRowValue}>Sigma Eclipse v{appVersion}</span>
           </div>
           <div className={s.UiSettingsOtherRow}>
             <span className={s.UiSettingsOtherRowLabel}>Auto start</span>
@@ -152,57 +150,6 @@ export function OtherTab({ onError }: { onError: (msg: string | null) => void })
               PolyForm Noncommercial 1.0.0
             </button>
           </div>
-          <div className={s.UiSettingsOtherRow}>
-            <span className={s.UiSettingsOtherRowLabel}>Support</span>
-            <a href="mailto:support@atomicbot.ai" className={s.UiSettingsOtherLink}>
-              support@atomicbot.ai
-            </a>
-          </div>
-          <div className={s.UiSettingsOtherRow}>
-            <NavLink to={routes.legacy} className={s.UiSettingsOtherLink}>
-              Legacy UI Dashboard
-            </NavLink>
-          </div>
-        </div>
-        <div className={s.UiSettingsOtherLinksRow}>
-          <span className={s.UiSettingsOtherFooterCopy}>
-            &copy; {new Date().getFullYear()} Atomic Bot
-          </span>
-          <button
-            type="button"
-            className={s.UiSettingsOtherFooterLink}
-            onClick={() => openExternal("https://github.com/AtomicBot-ai/atomicbot")}
-          >
-            GitHub
-          </button>
-          <button
-            type="button"
-            className={s.UiSettingsOtherFooterLink}
-            onClick={() => openExternal("https://atomicbot.ai")}
-          >
-            Website
-          </button>
-          <button
-            type="button"
-            className={s.UiSettingsOtherFooterLink}
-            onClick={() => openExternal("https://x.com/atomicbot_ai")}
-          >
-            X
-          </button>
-          <button
-            type="button"
-            className={s.UiSettingsOtherFooterLink}
-            onClick={() => openExternal("https://www.instagram.com/atomicbot.ai/")}
-          >
-            Instagram
-          </button>
-          <button
-            type="button"
-            className={s.UiSettingsOtherFooterLink}
-            onClick={() => openExternal("https://discord.gg/2TXafRV69m")}
-          >
-            Discord
-          </button>
         </div>
       </section>
 
@@ -272,36 +219,6 @@ export function OtherTab({ onError }: { onError: (msg: string | null) => void })
         <p className={s.UiSettingsOtherHint}>
           Contains your local OpenClaw state and app data. Workspace contains editable .md files
           (AGENTS, SOUL, USER, IDENTITY, TOOLS, HEARTBEAT, BOOTSTRAP) that shape the agent.
-        </p>
-      </section>
-
-      {/* Terminal */}
-      <section className={s.UiSettingsOtherSection}>
-        <h3 className={s.UiSettingsOtherSectionTitle}>Terminal</h3>
-        <div className={s.UiSettingsOtherCard}>
-          <div className={s.UiSettingsOtherRow}>
-            <span className={s.UiSettingsOtherRowLabel}>Show in sidebar</span>
-            <span className={s.UiSettingsOtherAppRowValue}>
-              <label className={s.UiSettingsOtherToggle} aria-label="Show terminal in sidebar">
-                <input
-                  type="checkbox"
-                  checked={terminalSidebar}
-                  onChange={(e) => setTerminalSidebar(e.target.checked)}
-                />
-                <span className={s.UiSettingsOtherToggleTrack}>
-                  <span className={s.UiSettingsOtherToggleThumb} />
-                </span>
-              </label>
-            </span>
-          </div>
-          <div className={s.UiSettingsOtherRow}>
-            <NavLink to={routes.terminal} className={s.UiSettingsOtherLink}>
-              Open Terminal
-            </NavLink>
-          </div>
-        </div>
-        <p className={s.UiSettingsOtherHint}>
-          Built-in terminal with openclaw and bundled tools in PATH.
         </p>
       </section>
 

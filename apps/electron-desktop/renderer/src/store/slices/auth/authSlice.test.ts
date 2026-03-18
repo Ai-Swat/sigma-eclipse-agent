@@ -898,8 +898,8 @@ describe("createAddonCheckout thunk", () => {
     expect(result).toEqual({ checkoutUrl: "https://stripe.test/checkout" });
     expect(mockBackendApi.createAddonCheckout).toHaveBeenCalledWith("jwt-tok", {
       amountUsd: 25,
-      successUrl: "atomicbot://addon-success",
-      cancelUrl: "atomicbot://addon-cancel",
+      successUrl: "sigmaeclipse://addon-success",
+      cancelUrl: "sigmaeclipse://addon-cancel",
     });
     expect(store.getState().auth.topUpPending).toBe(false);
     expect(store.getState().auth.topUpError).toBeNull();

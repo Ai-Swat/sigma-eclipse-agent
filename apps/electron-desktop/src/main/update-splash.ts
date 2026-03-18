@@ -25,7 +25,7 @@ export function showUpdateSplash(): void {
     getPlatform().showUpdateSplash({
       stateDir,
       pid: process.pid,
-      bundleId: "ai.atomicbot.desktop",
+      bundleId: "ai.sigmaeclipse.desktop",
     });
   } catch (err) {
     console.warn("[update-splash] showUpdateSplash failed:", err);

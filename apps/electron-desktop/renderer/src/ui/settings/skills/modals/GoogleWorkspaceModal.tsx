@@ -147,8 +147,8 @@ export function GoogleWorkspaceModalContent(props: {
           <div className="UiBannerTitle">How to connect your Google account</div>
           <div className="UiBannerSubtitle">
             Google may show an extra verification screen while our app is under review. This is
-            normal for new apps. To continue safely сlick “Advanced” and select “Go to Atomic Bot”.
-            Your Google account remains protected.
+            normal for new apps. To continue safely сlick “Advanced” and select “Go to Sigma
+            Eclipse”. Your Google account remains protected.
           </div>
         </div>
         <div className="UiBannerImageContainer">

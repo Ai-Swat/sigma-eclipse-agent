@@ -63,7 +63,7 @@
   gap: 4px;
   border-radius: var(--radius-full);
   background: var(--lime);
-  color: var(--surface-primary);
+  color: #fff;
   text-align: center;
   font-size: 13px;
   font-style: normal;

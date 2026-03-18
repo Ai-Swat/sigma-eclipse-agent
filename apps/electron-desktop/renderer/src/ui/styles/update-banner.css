@@ -48,7 +48,7 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-10);
-  background: rgba(174, 255, 0, 0.1);
+  background: rgba(0, 122, 255, 0.1);
   color: var(--lime);
 }
 
@@ -110,7 +110,7 @@
 
 .UpdateBanner-btn--primary {
   background: var(--lime);
-  color: var(--surface-primary);
+  color: #fff;
   font-weight: 650;
 }
 
@@ -148,7 +148,7 @@
 .UpdateBanner-progressBar {
   height: 100%;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--lime), #c8ff4d);
+  background: linear-gradient(90deg, var(--lime), rgb(51, 149, 255));
   transition: width 200ms ease;
 }
 

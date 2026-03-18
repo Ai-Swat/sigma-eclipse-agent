@@ -14,7 +14,10 @@ export const useServerStatus = () => {
       try {
         const api = getDesktopApi();
         const serverStatus = await api.sigmaGetServerStatus();
-        setStatus(serverStatus);
+        setStatus({
+          ...serverStatus,
+          message: serverStatus.is_running ? serverStatus.message : "Not running",
+        });
       } catch (error) {
         console.error("Failed to get status:", error);
       }

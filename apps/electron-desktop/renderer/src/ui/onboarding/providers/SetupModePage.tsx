@@ -27,12 +27,13 @@ export function SetupModePage(props: {
             </div>
           </div>
 
-          <div className={s.UiSetupModeOptions}>
-            <div className="UiSectionCard">
-              <div>
-                <div className={s.UiSetupModeIcon}>
-                  <img src={cursorIcon} alt="" width={35} height={35} />
-                </div>
+          <div className={s.UiSetupModePanel}>
+            <div className={s.UiSetupModePanelBody}>
+              <div className={s.UiSetupModeIcon}>
+                <img src={cursorIcon} alt="" width={35} height={35} />
+              </div>
+
+              <div className={s.UiSetupModePanelInfo}>
                 <div className={s.UiSetupModeTitle}>Manual setup</div>
                 <div className={s.UiSetupModeDesc}>Free with your own API Keys</div>
                 <ul className={s.UiSetupModeFeatures}>
@@ -41,20 +42,23 @@ export function SetupModePage(props: {
                   <li>No subscription required</li>
                 </ul>
               </div>
-
-              <SecondaryButton
-                size="sm"
-                onClick={() => {
-                  props.onSelect("self-managed");
-                }}
-              >
-                Set up with API keys
-              </SecondaryButton>
             </div>
+
+            <SecondaryButton
+              onClick={() => {
+                props.onSelect("self-managed");
+              }}
+            >
+              Set up with API keys →
+            </SecondaryButton>
           </div>
 
           {props.onBack && (
-            <button className="UiTextButton" type="button" onClick={props.onBack}>
+            <button
+              className={`UiTextButton ${s.UiBackButton}`}
+              type="button"
+              onClick={props.onBack}
+            >
               ← Back to home
             </button>
           )}

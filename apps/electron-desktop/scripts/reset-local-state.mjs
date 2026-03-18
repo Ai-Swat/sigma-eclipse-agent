@@ -33,7 +33,7 @@ function safeRmrf(target) {
   // Safety guard: only allow deleting paths that clearly belong to this Electron wrapper.
   // Note: the embedded OpenClaw state is stored under Electron's `userData` dir.
   const allowedMarkers = [
-    path.sep + "atomicbot-desktop",
+    path.sep + "sigma-eclipse-desktop",
     // Back-compat / legacy names.
     path.sep + "openclaw-electron-desktop",
     path.sep + "Sigma Eclipse",
@@ -136,7 +136,7 @@ function clearGogAuth(gogBin) {
   }
 }
 
-const electronUserDataDir = resolveElectronUserDataDir("atomicbot-desktop");
+const electronUserDataDir = resolveElectronUserDataDir("sigma-eclipse-desktop");
 
 const targets = [
   { label: "Electron userData", path: electronUserDataDir },

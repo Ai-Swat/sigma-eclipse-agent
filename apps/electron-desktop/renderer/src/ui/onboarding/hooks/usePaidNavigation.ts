@@ -11,10 +11,6 @@ type PaidNavigationInput = {
  * Each callback navigates to a unified route path.
  */
 export function usePaidNavigation({ navigate }: PaidNavigationInput) {
-  const goSetupMode = React.useCallback(() => {
-    void navigate(`${routes.welcome}/setup-mode`);
-  }, [navigate]);
-
   const goPaidModelSelect = React.useCallback(() => {
     void navigate(`${routes.welcome}/paid-model-select`);
   }, [navigate]);
@@ -64,7 +60,6 @@ export function usePaidNavigation({ navigate }: PaidNavigationInput) {
   }, [goPaidConnections, goPaidSkills]);
 
   return {
-    goSetupMode,
     goPaidModelSelect,
     goSetupReview,
     goSuccess,

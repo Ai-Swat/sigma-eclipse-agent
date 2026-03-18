@@ -1,5 +1,5 @@
 {
-  "name": "atomicbot-desktop",
+  "name": "sigma-eclipse-desktop",
   "private": true,
   "version": "1.0.62",
   "description": "Sigma Eclipse makes things for you",
@@ -110,13 +110,13 @@
     "react-hot-toast": "^2.6.0"
   },
   "build": {
-    "appId": "ai.atomicbot.desktop",
+    "appId": "ai.sigmaeclipse.desktop",
     "productName": "Sigma Eclipse",
     "protocols": [
       {
         "name": "Sigma Eclipse",
         "schemes": [
-          "atomicbot"
+          "sigmaeclipse"
         ]
       }
     ],
@@ -199,8 +199,8 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "AtomicBot-ai",
-      "repo": "atomicbot",
+      "owner": "sigmaeclipse",
+      "repo": "sigma-eclipse",
       "releaseType": "draft"
     },
     "mac": {
@@ -225,7 +225,7 @@
         "nsis"
       ],
       "requestedExecutionLevel": "asInvoker",
-      "executableName": "AtomicBot"
+      "executableName": "SigmaEclipse"
     },
     "nsis": {
       "oneClick": true,

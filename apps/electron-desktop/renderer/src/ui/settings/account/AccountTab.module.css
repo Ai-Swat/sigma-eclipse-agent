@@ -142,8 +142,8 @@
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  background: var(--lime, #aeff00);
-  color: var(--surface-primary, #121212);
+  background: var(--lime, rgb(0, 122, 255));
+  color: #fff;
   transition: opacity 150ms ease;
 }
 
@@ -582,7 +582,7 @@
   padding: 18px;
   border-radius: var(--radius-lg, 14px);
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(174, 255, 0, 0.15);
+  border: 1px solid rgba(0, 122, 255, 0.15);
 }
 
 .promoHeader {
@@ -634,7 +634,7 @@
 
 .promoFeatures li::before {
   content: "✓ ";
-  color: var(--lime, #aeff00);
+  color: var(--lime, rgb(0, 122, 255));
   font-weight: 600;
 }
 

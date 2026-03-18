@@ -52,7 +52,7 @@ export function RestoreOptionPage(props: { totalSteps: number; activeStep: numbe
           throw new Error(result.error || "Restore failed");
         }
         void dispatch(setOnboarded(true));
-        void navigate(routes.chat, { replace: true });
+        void navigate(routes.settings, { replace: true });
         return;
       }
 
@@ -74,7 +74,7 @@ export function RestoreOptionPage(props: { totalSteps: number; activeStep: numbe
         throw new Error(restoreResult.error || "Restore failed");
       }
       void dispatch(setOnboarded(true));
-      void navigate(routes.chat, { replace: true });
+      void navigate(routes.settings, { replace: true });
     } catch (err) {
       setError(errorToMessage(err));
       setPageState("error");

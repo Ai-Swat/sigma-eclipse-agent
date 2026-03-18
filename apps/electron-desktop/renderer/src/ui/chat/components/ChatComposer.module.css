@@ -274,7 +274,7 @@
   border: none;
   border-radius: 50%;
   background: var(--lime);
-  color: var(--bg-base);
+  color: #fff;
   cursor: pointer;
   transition:
     background var(--transition-fast),
@@ -408,7 +408,7 @@
 .UiChatMicButton--recording {
   color: var(--bg-base);
   background: var(--lime);
-  box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.35);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.35);
   animation: micPulse 1.2s ease-in-out infinite;
 }
 
@@ -441,10 +441,10 @@
 @keyframes micPulse {
   0%,
   100% {
-    box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.35);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.35);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(163, 230, 53, 0.15);
+    box-shadow: 0 0 0 6px rgba(0, 122, 255, 0.15);
   }
 }
 
