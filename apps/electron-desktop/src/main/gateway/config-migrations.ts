@@ -183,6 +183,39 @@ export const DESKTOP_CONFIG_MIGRATIONS: ConfigMigration[] = [
       return changed;
     },
   },
+  // sigma: point browser tool at SigmaBrowser instead of system Chrome
+  {
+    version: 4,
+    description: "Set browser.executablePath to SigmaBrowser on macOS",
+    apply: (cfg) => {
+      if (process.platform !== "darwin") return false;
+      const browser = ensureObject(cfg, "browser");
+      if (typeof browser.executablePath === "string") return false;
+      browser.executablePath = "/Applications/Sigma.app/Contents/MacOS/Sigma";
+      return true;
+    },
+  },
+  // sigma: use chrome-relay profile so the agent controls tabs inside the
+  // running SigmaBrowser instance via the extension's CDP relay client
+  {
+    version: 5,
+    description: "Set defaultProfile=user with extension driver for relay",
+    apply: (cfg) => {
+      const browser = ensureObject(cfg, "browser");
+      const profiles = ensureObject(browser, "profiles");
+      const user = profiles.user as Record<string, unknown> | undefined;
+      let changed = false;
+      if (browser.defaultProfile !== "user") {
+        browser.defaultProfile = "user";
+        changed = true;
+      }
+      if (!user || user.driver !== "extension") {
+        profiles.user = { driver: "extension", cdpUrl: "http://127.0.0.1:18792", color: "#00AA00" };
+        changed = true;
+      }
+      return changed;
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------

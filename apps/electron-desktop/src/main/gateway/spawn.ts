@@ -113,6 +113,10 @@ export function spawnGateway(
       console.log("[gateway] WHISPER_CPP_MODEL =", modelPath);
       return { WHISPER_CPP_MODEL: modelPath };
     })(),
+    // sigma: ensure diffs extension also uses SigmaBrowser
+    ...(process.platform === "darwin"
+      ? { OPENCLAW_BROWSER_EXECUTABLE_PATH: "/Applications/Sigma.app/Contents/MacOS/Sigma" }
+      : {}),
     // Reduce noise in embedded contexts.
     NO_COLOR: "1",
     FORCE_COLOR: "0",

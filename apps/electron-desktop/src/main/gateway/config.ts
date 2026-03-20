@@ -50,7 +50,14 @@ export function ensureGatewayConfigFile(params: { configPath: string; token: str
       },
     },
     browser: {
-      defaultProfile: "openclaw",
+      defaultProfile: "user",
+      profiles: {
+        user: { driver: "extension", cdpUrl: "http://127.0.0.1:18792", color: "#00AA00" },
+      },
+      // sigma: SigmaBrowser path as fallback when "openclaw" profile is used directly
+      ...(process.platform === "darwin"
+        ? { executablePath: "/Applications/Sigma.app/Contents/MacOS/Sigma" }
+        : {}),
     },
     logging: {
       level: "debug",

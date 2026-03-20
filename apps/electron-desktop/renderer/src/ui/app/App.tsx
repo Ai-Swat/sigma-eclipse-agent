@@ -35,6 +35,8 @@ import { ExecApprovalOverlay } from "./ExecApprovalModal";
 import { UpdateBanner } from "../updates/UpdateBanner";
 import { DefenderBanner } from "../updates/DefenderBanner";
 import { AppBanners } from "../shared/banners/AppBanners";
+// sigma: deep link navigation for extension ↔ desktop app
+import { useDeepLinkNavigation } from "./hooks/useDeepLinkNavigation";
 import a from "./App.module.css";
 
 function ChatRoute({ state }: { state: Extract<GatewayState, { kind: "ready" }> }) {
@@ -177,6 +179,9 @@ export function App() {
     void dispatch(loadOnboardingFromStorage());
     void dispatch(restoreMode());
   }, [dispatch]);
+
+  // sigma: navigate to specific pages via deep links from the extension
+  useDeepLinkNavigation();
 
   // Auto-navigate when gateway state changes (loading → ready / failed).
   React.useEffect(() => {
