@@ -88,7 +88,7 @@ module.exports = async function afterSign(context) {
     throw new Error(`[electron-desktop] afterSign: notarize script not found: ${notarizeScript}`);
   }
 
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "atomicbot-notary-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sigmabrowser-notary-"));
   const appName = path.basename(appBundle, ".app");
   const zipPath = path.join(tmpDir, `${appName}.notary.zip`);
 

@@ -14,10 +14,10 @@ One app. All your AI models. All your tools. All your messengers. Batteries incl
 [![CI](https://img.shields.io/github/actions/workflow/status/openclaw/openclaw/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/openclaw/openclaw/actions/workflows/ci.yml)
 [![license](https://img.shields.io/github/license/openclaw/openclaw?style=flat-square)](https://github.com/openclaw/openclaw/blob/main/LICENSE)
 
-**[Get Sigma Eclipse](https://atomicbot.ai)** · **[Download for macOS](https://github.com/AtomicBot-ai/atomicbot/releases/latest)** · **[Download for Windows](https://github.com/AtomicBot-ai/atomicbot/releases/latest)**
+**[Get Sigma Eclipse](https://www.sigmabrowser.com/local-ai-chat)** · **[Download for macOS](https://github.com/Ai-Swat/sigma-eclipse-agent/releases/latest)** · **[Download for Windows](https://github.com/Ai-Swat/sigma-eclipse-agent/releases/latest)**
 
-[![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/AtomicBot-ai/atomicbot/releases/latest)
-[![Windows](https://img.shields.io/badge/Windows-x64-0078D4?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/AtomicBot-ai/atomicbot/releases/latest)
+[![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/Ai-Swat/sigma-eclipse-agent/releases/latest)
+[![Windows](https://img.shields.io/badge/Windows-x64-0078D4?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/Ai-Swat/sigma-eclipse-agent/releases/latest)
 
 </div>
 
@@ -133,8 +133,8 @@ Want to connect messengers or enable skills? The app walks you through it with a
 
 ## Links
 
-- **Website** — [atomicbot.ai](https://atomicbot.ai)
-- **Releases** — [GitHub Releases](https://github.com/AtomicBot-ai/atomicbot/releases)
+- **Website** — [sigmabrowser.com](https://www.sigmabrowser.com/local-ai-chat)
+- **Releases** — [GitHub Releases](https://github.com/Ai-Swat/sigma-eclipse-agent/releases)
 - **Support** — [GitHub Issues](https://github.com/openclaw/openclaw/issues)
 
 ## Open source foundation

@@ -65,7 +65,7 @@ JSONEOF
 
 rm -f "$OUT_DMG"
 
-echo "[atomicbot] build-dmg-from-app: building styled DMG via appdmg"
+echo "[sigma-eclipse] build-dmg-from-app: building styled DMG via appdmg"
 npx appdmg "$TMP_CONFIG" "$OUT_DMG"
 
-echo "[atomicbot] build-dmg-from-app: ready: $OUT_DMG"
+echo "[sigma-eclipse] build-dmg-from-app: ready: $OUT_DMG"

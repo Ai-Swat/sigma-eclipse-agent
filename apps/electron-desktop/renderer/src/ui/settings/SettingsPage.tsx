@@ -47,7 +47,7 @@ const ALL_TABS: TabDef[] = [
 ];
 
 function getVisibleTabs(_mode: SetupMode | null): TabDef[] {
-  return ALL_TABS.filter((t) => t.tab !== "model" && t.tab !== "providers");
+  return ALL_TABS.filter((t) => t.tab !== "model" && t.tab !== "providers" && t.tab !== "voice");
 }
 
 function SettingsTabItem({ to, children }: { to: string; children: React.ReactNode }) {

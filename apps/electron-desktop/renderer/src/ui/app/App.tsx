@@ -120,7 +120,7 @@ function ErrorScreen({ state }: { state: Extract<GatewayState, { kind: "failed" 
   return (
     <div className={a.UiCentered}>
       <div className={a.UiCard}>
-        <div className={a.UiCardTitle}>OpenClaw Gateway failed to start</div>
+        <div className={a.UiCardTitle}>Sigma Eclipse Gateway failed to start</div>
         <div className={a.UiCardSubtitle}>
           The Gateway process did not become available. Open the logs to see the root cause.
         </div>
@@ -147,7 +147,7 @@ function LegacyScreen({ state }: { state: Extract<GatewayState, { kind: "ready" 
   }, [state.url, state.token]);
   return (
     <div className={a.IframeWrap}>
-      <iframe title="OpenClaw Control UI" src={legacyUrl} />
+      <iframe title="Sigma Eclipse Control UI" src={legacyUrl} />
     </div>
   );
 }

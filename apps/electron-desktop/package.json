@@ -15,8 +15,7 @@
     "prepare:remindctl:all": "npm run fetch:remindctl && npm run prepare:remindctl",
     "prepare:obsidian-cli:all": "npm run fetch:obsidian-cli && npm run prepare:obsidian-cli",
     "prepare:gh:all": "npm run fetch:gh && npm run prepare:gh",
-    "prepare:whisper-cli:all": "npm run fetch:whisper-cli && npm run prepare:whisper-cli",
-    "prepare:runtimes": "npm run prepare:node && npm run prepare:gog:all && npm run prepare:jq:all && npm run prepare:memo:all && npm run prepare:remindctl:all && npm run prepare:obsidian-cli:all && npm run prepare:gh:all && npm run prepare:whisper-cli:all",
+    "prepare:runtimes": "npm run prepare:node && npm run prepare:gog:all && npm run prepare:jq:all && npm run prepare:memo:all && npm run prepare:remindctl:all && npm run prepare:obsidian-cli:all && npm run prepare:gh:all",
     "rebuild": "electron-rebuild -f -w node-pty",
     "dev": "npm run rebuild && npm run build:all && electron .",
     "build": "tsc -p tsconfig.json && esbuild dist/preload.js --bundle --platform=node --format=cjs --outfile=dist/preload.js --allow-overwrite --external:electron && npm run build:native-host",
@@ -35,7 +34,6 @@
     "fetch:remindctl": "node scripts/fetch-remindctl-runtime.mjs",
     "fetch:obsidian-cli": "node scripts/fetch-obsidian-cli-runtime.mjs",
     "fetch:gh": "node scripts/fetch-gh-runtime.mjs",
-    "fetch:whisper-cli": "node scripts/fetch-whisper-cli-runtime.mjs",
     "build:memo": "node scripts/build-memo-runtime.mjs",
     "prepare:gog:credentials": "node --env-file=.env scripts/prepare-gog-credentials.mjs",
     "prepare:gog": "node scripts/prepare-gog-runtime.mjs",
@@ -44,7 +42,6 @@
     "prepare:remindctl": "node scripts/prepare-remindctl-runtime.mjs",
     "prepare:obsidian-cli": "node scripts/prepare-obsidian-cli-runtime.mjs",
     "prepare:gh": "node scripts/prepare-gh-runtime.mjs",
-    "prepare:whisper-cli": "node scripts/prepare-whisper-cli-runtime.mjs",
     "reset:local": "node scripts/reset-local-state.mjs",
     "reset:local:yes": "node scripts/reset-local-state.mjs --yes",
     "format": "prettier --check .",
@@ -190,10 +187,6 @@
         "to": "gh"
       },
       {
-        "from": "vendor/whisper-cli",
-        "to": "whisper-cli"
-      },
-      {
         "from": ".gog-runtime/credentials",
         "to": "gog-credentials"
       },
@@ -204,12 +197,12 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "sigmaeclipse",
-      "repo": "sigma-eclipse",
+      "owner": "Ai-Swat",
+      "repo": "sigma-eclipse-agent",
       "releaseType": "draft"
     },
     "mac": {
-      "artifactName": "Atomic-Bot-${version}-${arch}-mac.${ext}",
+      "artifactName": "Sigma-Eclipse-${version}-${arch}-mac.${ext}",
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity",
       "hardenedRuntime": true,
@@ -224,7 +217,7 @@
       }
     },
     "win": {
-      "artifactName": "Atomic-Bot-${version}-${arch}-win.${ext}",
+      "artifactName": "Sigma-Eclipse-${version}-${arch}-win.${ext}",
       "icon": "assets/icon.ico",
       "target": [
         "nsis"

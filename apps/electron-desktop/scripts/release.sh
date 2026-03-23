@@ -100,7 +100,7 @@ echo "Running npm install to update package-lock.json..."
 # Commit and tag.
 git add "$PKG" "$APP_DIR/package-lock.json"
 git commit -m "electron-desktop: release $TAG"
-git tag -a "$TAG" -m "AtomicBot Desktop $TAG"
+git tag -a "$TAG" -m "SigmaEclipse Desktop $TAG"
 
 echo ""
 echo "Done! Created commit and tag $TAG."

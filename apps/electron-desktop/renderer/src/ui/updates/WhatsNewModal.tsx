@@ -7,9 +7,9 @@ import { openExternal } from "@shared/utils/openExternal";
 import s from "./WhatsNewModal.module.css";
 
 const STORAGE_KEY = "whatsNew_lastVersion";
-const LAUNCHED_KEY = "openclaw.desktop.launched";
-const GITHUB_OWNER = "sigmaeclipse";
-const GITHUB_REPO = "sigma-eclipse";
+const LAUNCHED_KEY = "sigmaeclipse.desktop.launched";
+const GITHUB_OWNER = "Ai-Swat";
+const GITHUB_REPO = "sigma-eclipse-agent";
 
 type WhatsNewState =
   | { kind: "idle" }

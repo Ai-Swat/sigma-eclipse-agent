@@ -113,7 +113,7 @@ async function main() {
 
   const repo =
     (process.env.WHISPER_CLI_REPO && String(process.env.WHISPER_CLI_REPO).trim()) ||
-    "AtomicBot-ai/whisper.cpp";
+    "SigmaBrowser-ai/whisper.cpp";
   const tag =
     (process.env.WHISPER_CLI_TAG && String(process.env.WHISPER_CLI_TAG).trim()) || "v1.0.1";
   const apiUrl =

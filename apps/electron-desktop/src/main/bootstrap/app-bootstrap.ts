@@ -25,6 +25,8 @@ import { installAgentNativeMessaging } from "../native-messaging/install";
 import { createTailBuffer, pickPort } from "../util/net";
 import { killUpdateSplash } from "../update-splash";
 import { initAutoUpdater } from "../updater";
+// sigma: heartbeat so the native host can detect the app is running
+import { updateAppHeartbeat, clearAppStatus } from "../sigma/services/ipc-state";
 
 type EnsureWindow = () => Promise<BrowserWindow | null>;
 type EnsureTray = () => void;
@@ -168,4 +170,15 @@ export async function bootstrapApp(params: {
   });
 
   await startGateway();
+
+  // sigma: heartbeat so the native host detects the Electron app as running
+  const heartbeatInterval = setInterval(() => {
+    updateAppHeartbeat(process.pid);
+  }, 3000);
+  updateAppHeartbeat(process.pid);
+
+  app.on("before-quit", () => {
+    clearInterval(heartbeatInterval);
+    clearAppStatus();
+  });
 }

@@ -127,10 +127,6 @@ jobs:
         working-directory: apps/electron-desktop
         run: npm run prepare:obsidian-cli:all
 
-      - name: Prepare whisper-cli runtime
-        working-directory: apps/electron-desktop
-        run: npm run prepare:whisper-cli:all
-
       # Determine if we should publish to GitHub Releases.
       - name: Determine publish mode
         id: publish-mode
@@ -350,10 +346,6 @@ jobs:
         working-directory: apps/electron-desktop
         run: npm run prepare:obsidian-cli:all
 
-      - name: Prepare whisper-cli runtime
-        working-directory: apps/electron-desktop
-        run: npm run prepare:whisper-cli:all
-
       - name: Determine publish mode
         id: publish-mode
         run: |
@@ -439,8 +431,8 @@ jobs:
           $unpacked    = "$releasePath\win-unpacked"
 
           # Targeted collection: Electron core + bundled tools only.
-          # Native addons (openclaw node_modules), whisper-cli (already signed),
-          # and app.asar.unpacked (pre-signed earlier) are skipped.
+          # Native addons (openclaw node_modules) and app.asar.unpacked
+          # (pre-signed earlier) are skipped.
           $files = @()
           $files += Get-ChildItem -Path $releasePath -File -Filter "*.exe" -ErrorAction SilentlyContinue
           $files += Get-ChildItem -Path $unpacked -File -Filter "*.exe" -ErrorAction SilentlyContinue

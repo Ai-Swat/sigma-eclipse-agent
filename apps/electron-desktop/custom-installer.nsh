@@ -1,10 +1,10 @@
 !macro customInit
-  nsExec::ExecToLog "taskkill /f /im AtomicBot.exe"
+  nsExec::ExecToLog "taskkill /f /im SigmaEclipse.exe"
   Sleep 1000
 !macroend
 
 !macro customCheckAppRunning
-  nsExec::Exec '"$SYSDIR\cmd.exe" /C tasklist /FI "IMAGENAME eq AtomicBot.exe" | "$SYSDIR\find.exe" "AtomicBot.exe"'
+  nsExec::Exec '"$SYSDIR\cmd.exe" /C tasklist /FI "IMAGENAME eq SigmaEclipse.exe" | "$SYSDIR\find.exe" "SigmaEclipse.exe"'
   Pop $R0
 
   ${if} $R0 == 0
@@ -13,10 +13,10 @@
 
     doStopProcess:
       DetailPrint "$(appClosing)"
-      nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM "AtomicBot.exe"'
+      nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM "SigmaEclipse.exe"'
       Sleep 1000
 
-      nsExec::Exec '"$SYSDIR\cmd.exe" /C tasklist /FI "IMAGENAME eq AtomicBot.exe" | "$SYSDIR\find.exe" "AtomicBot.exe"'
+      nsExec::Exec '"$SYSDIR\cmd.exe" /C tasklist /FI "IMAGENAME eq SigmaEclipse.exe" | "$SYSDIR\find.exe" "SigmaEclipse.exe"'
       Pop $R0
       ${if} $R0 == 0
         MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(appCannotBeClosed)" /SD IDCANCEL IDRETRY doStopProcess
@@ -52,6 +52,6 @@
 !macro customUnInstall
   MessageBox MB_YESNO "Do you want to delete all application data?" /SD IDNO IDYES deleteData IDNO skipDelete
   deleteData:
-    RMDir /r "$APPDATA\atomicbot-desktop"
+    RMDir /r "$APPDATA\sigma-eclipse-desktop"
   skipDelete:
 !macroend
