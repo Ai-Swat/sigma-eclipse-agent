@@ -48,6 +48,26 @@ export function normalizeTimeoutMs(timeoutMs: number | undefined, fallback: numb
   return Math.max(500, Math.min(120_000, timeoutMs ?? fallback));
 }
 
+export function isRetryablePlaywrightError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return (
+    msg.includes("socket closed") ||
+    msg.includes("socket hung up") ||
+    msg.includes("target closed") ||
+    msg.includes("target crashed") ||
+    msg.includes("session closed") ||
+    msg.includes("frame has been detached") ||
+    msg.includes("not connected") ||
+    msg.includes("extension disconnected") ||
+    msg.includes("extension request timeout") ||
+    msg.includes("cdp command timeout") ||
+    msg.includes("page has been closed") ||
+    msg.includes("context or browser has been closed") ||
+    msg.includes("no attached tab") ||
+    msg.includes("debugger_dead")
+  );
+}
+
 export function toAIFriendlyError(error: unknown, selector: string): Error {
   const message = error instanceof Error ? error.message : String(error);
 

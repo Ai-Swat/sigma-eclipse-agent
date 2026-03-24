@@ -89,7 +89,11 @@ function readActRequestParam(params: Record<string, unknown>) {
     return requestParam as Parameters<typeof browserAct>[1];
   }
 
-  const kind = readStringParam(params, "kind");
+  let kind = readStringParam(params, "kind");
+  // When fn is provided without kind, default to evaluate.
+  if (!kind && readStringParam(params, "fn")) {
+    kind = "evaluate";
+  }
   if (!kind) {
     return undefined;
   }
@@ -316,7 +320,10 @@ export function createBrowserTool(opts?: {
       'If the user mentions the Sigma Eclipse Extension / “attach tab”, you may use profile="chrome-relay", but the default already routes through the extension relay.',
       'When a node-hosted browser proxy is available, the tool may auto-route to it. Pin a node with node=<id|name> or target="node".',
       "Browser is always available — the Sigma Eclipse Extension auto-attaches tabs. No user clicks or confirmations needed.",
-      "When using refs from snapshot (e.g. e12), keep the same tab: prefer passing targetId from the snapshot response into subsequent actions (act/click/type/etc).",
+      'WORKFLOW: 1) action="snapshot" with refs="role" returns refs like [S1], [S2], etc.',
+      '2) To interact, use action="act" with kind and ref from snapshot: kind="click" ref="S1", kind="type" ref="S2" text="...", kind="hover" ref="S3", kind="press" key="Enter".',
+      "IMPORTANT: Never use fn with refs.find().click(). Always use kind=click/type/hover with ref=<refId> from the snapshot output. The ref parameter directly accepts snapshot ref IDs (e.g. S1, S42, e12).",
+      "Keep the same targetId from the snapshot response for subsequent act calls on that tab.",
       'For stable, self-resolving refs across calls, use snapshot with refs="aria" (Playwright aria-ref ids). Default refs="role" are role+name-based.',
       "Use snapshot+act for UI automation. Avoid act:wait by default; use only in exceptional cases when no reliable UI state exists.",
       `target selects browser location (sandbox|host|node). Default: ${targetDefault}.`,

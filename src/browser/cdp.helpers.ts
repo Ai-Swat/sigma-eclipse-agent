@@ -31,7 +31,10 @@ type CdpResponse = {
 type Pending = {
   resolve: (value: unknown) => void;
   reject: (err: Error) => void;
+  timer?: ReturnType<typeof setTimeout>;
 };
+
+const DEFAULT_CDP_COMMAND_TIMEOUT_MS = 25_000;
 
 export type CdpSendFn = (
   method: string,
@@ -90,7 +93,8 @@ export function normalizeCdpHttpBaseForJsonEndpoints(cdpUrl: string): string {
   }
 }
 
-function createCdpSender(ws: WebSocket) {
+function createCdpSender(ws: WebSocket, opts?: { commandTimeoutMs?: number }) {
+  const commandTimeoutMs = opts?.commandTimeoutMs ?? DEFAULT_CDP_COMMAND_TIMEOUT_MS;
   let nextId = 1;
   const pending = new Map<number, Pending>();
 
@@ -103,12 +107,24 @@ function createCdpSender(ws: WebSocket) {
     const msg = { id, method, params, sessionId };
     ws.send(JSON.stringify(msg));
     return new Promise<unknown>((resolve, reject) => {
-      pending.set(id, { resolve, reject });
+      const timer =
+        commandTimeoutMs > 0
+          ? setTimeout(() => {
+              if (pending.has(id)) {
+                pending.delete(id);
+                reject(new Error(`CDP command timeout: ${method} (${commandTimeoutMs}ms)`));
+              }
+            }, commandTimeoutMs)
+          : undefined;
+      pending.set(id, { resolve, reject, timer });
     });
   };
 
   const closeWithError = (err: Error) => {
     for (const [, p] of pending) {
+      if (p.timer) {
+        clearTimeout(p.timer);
+      }
       p.reject(err);
     }
     pending.clear();
@@ -132,6 +148,9 @@ function createCdpSender(ws: WebSocket) {
       const p = pending.get(parsed.id);
       if (!p) {
         return;
+      }
+      if (p.timer) {
+        clearTimeout(p.timer);
       }
       pending.delete(parsed.id);
       if (parsed.error?.message) {
@@ -213,10 +232,16 @@ export function openCdpWebSocket(
 export async function withCdpSocket<T>(
   wsUrl: string,
   fn: (send: CdpSendFn) => Promise<T>,
-  opts?: { headers?: Record<string, string>; handshakeTimeoutMs?: number },
+  opts?: {
+    headers?: Record<string, string>;
+    handshakeTimeoutMs?: number;
+    commandTimeoutMs?: number;
+  },
 ): Promise<T> {
   const ws = openCdpWebSocket(wsUrl, opts);
-  const { send, closeWithError } = createCdpSender(ws);
+  const { send, closeWithError } = createCdpSender(ws, {
+    commandTimeoutMs: opts?.commandTimeoutMs,
+  });
 
   const openPromise = new Promise<void>((resolve, reject) => {
     ws.once("open", () => resolve());

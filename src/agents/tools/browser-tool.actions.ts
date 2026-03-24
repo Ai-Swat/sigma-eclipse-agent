@@ -78,7 +78,7 @@ function isRelayStaleTargetError(profile: string | undefined, err: unknown): boo
     return false;
   }
   const msg = String(err);
-  return msg.includes("404:") && msg.includes("tab not found");
+  return msg.includes("tab not found") || msg.includes("no attached tab");
 }
 
 function stripTargetIdFromActRequest(
@@ -182,17 +182,31 @@ export async function executeSnapshotAction(params: {
     labels,
     mode,
   };
-  const snapshot = proxyRequest
-    ? ((await proxyRequest({
-        method: "GET",
-        path: "/snapshot",
-        profile,
-        query: snapshotQuery,
-      })) as Awaited<ReturnType<typeof browserSnapshot>>)
-    : await browserSnapshot(baseUrl, {
-        ...snapshotQuery,
-        profile,
-      });
+  const attemptSnapshot = (query: typeof snapshotQuery) =>
+    proxyRequest
+      ? (proxyRequest({
+          method: "GET",
+          path: "/snapshot",
+          profile,
+          query,
+        }) as Promise<Awaited<ReturnType<typeof browserSnapshot>>>)
+      : browserSnapshot(baseUrl, {
+          ...query,
+          profile,
+        });
+
+  let snapshot: Awaited<ReturnType<typeof browserSnapshot>>;
+  try {
+    snapshot = await attemptSnapshot(snapshotQuery);
+  } catch (firstErr) {
+    // On stale target, retry without targetId so the gateway picks the current tab.
+    const retryQuery =
+      isRelayStaleTargetError(profile, firstErr) && snapshotQuery.targetId
+        ? { ...snapshotQuery, targetId: undefined }
+        : snapshotQuery;
+    await new Promise((r) => setTimeout(r, 2000));
+    snapshot = await attemptSnapshot(retryQuery);
+  }
   if (snapshot.format === "ai") {
     const extractedText = snapshot.snapshot ?? "";
     const wrappedSnapshot = wrapExternalContent(extractedText, {
@@ -283,6 +297,26 @@ export async function executeConsoleAction(params: {
   return formatConsoleToolResult(result);
 }
 
+function isRetryableActError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return (
+    msg.includes("socket closed") ||
+    msg.includes("socket hung up") ||
+    msg.includes("target closed") ||
+    msg.includes("target crashed") ||
+    msg.includes("session closed") ||
+    msg.includes("frame has been detached") ||
+    msg.includes("not connected") ||
+    msg.includes("extension disconnected") ||
+    msg.includes("extension request timeout") ||
+    msg.includes("cdp command timeout") ||
+    msg.includes("page has been closed") ||
+    msg.includes("context or browser has been closed") ||
+    msg.includes("no attached tab") ||
+    msg.includes("debugger_dead")
+  );
+}
+
 export async function executeActAction(params: {
   request: Parameters<typeof browserAct>[1];
   baseUrl?: string;
@@ -290,19 +324,31 @@ export async function executeActAction(params: {
   proxyRequest: BrowserProxyRequest | null;
 }): Promise<AgentToolResult<unknown>> {
   const { request, baseUrl, profile, proxyRequest } = params;
-  try {
-    const result = proxyRequest
-      ? await proxyRequest({
+
+  const attemptAct = (req: Parameters<typeof browserAct>[1]) =>
+    proxyRequest
+      ? proxyRequest({
           method: "POST",
           path: "/act",
           profile,
-          body: request,
+          body: req,
         })
-      : await browserAct(baseUrl, request, {
-          profile,
-        });
-    return jsonResult(result);
+      : browserAct(baseUrl, req, { profile });
+
+  try {
+    return jsonResult(await attemptAct(request));
   } catch (err) {
+    // Retry once on transient CDP/Playwright connection failures.
+    if (isRetryableActError(err)) {
+      const retryReq = request.targetId ? { ...request, targetId: undefined } : request;
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        return jsonResult(await attemptAct(retryReq));
+      } catch {
+        // Fall through to stale-target handling or rethrow.
+      }
+    }
+
     if (isRelayStaleTargetError(profile, err)) {
       const retryRequest = stripTargetIdFromActRequest(request);
       const tabs = proxyRequest
@@ -314,21 +360,9 @@ export async function executeActAction(params: {
             })) as { tabs?: unknown[] }
           ).tabs ?? [])
         : await browserTabs(baseUrl, { profile }).catch(() => []);
-      // Some relay targetIds can go stale between snapshots and actions.
-      // Only retry safe read-only actions, and only when exactly one tab remains attached.
       if (retryRequest && canRetryRelayActWithoutTargetId(request) && tabs.length === 1) {
         try {
-          const retryResult = proxyRequest
-            ? await proxyRequest({
-                method: "POST",
-                path: "/act",
-                profile,
-                body: retryRequest,
-              })
-            : await browserAct(baseUrl, retryRequest, {
-                profile,
-              });
-          return jsonResult(retryResult);
+          return jsonResult(await attemptAct(retryRequest));
         } catch {
           // Fall through to explicit stale-target guidance.
         }

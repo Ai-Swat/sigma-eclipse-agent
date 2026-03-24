@@ -538,6 +538,7 @@ export async function handleToolExecutionEnd(
       toolCallId,
       meta,
       isError: isToolError,
+      result: isToolError ? sanitizedResult : undefined,
     },
   });
 

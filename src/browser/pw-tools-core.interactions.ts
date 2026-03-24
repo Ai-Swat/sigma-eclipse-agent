@@ -9,6 +9,7 @@ import {
   restoreRoleRefsForTarget,
 } from "./pw-session.js";
 import {
+  isRetryablePlaywrightError,
   normalizeTimeoutMs,
   requireRef,
   requireRefOrSelector,
@@ -24,6 +25,7 @@ type TargetOpts = {
 const MAX_CLICK_DELAY_MS = 5_000;
 const MAX_WAIT_TIME_MS = 30_000;
 const MAX_BATCH_ACTIONS = 100;
+const INTERACTION_RETRY_DELAY_MS = 1500;
 
 function resolveBoundedDelayMs(value: number | undefined, label: string, maxMs: number): number {
   const normalized = Math.floor(value ?? 0);
@@ -89,33 +91,51 @@ export async function clickViaPlaywright(opts: {
   timeoutMs?: number;
 }): Promise<void> {
   const resolved = requireRefOrSelector(opts.ref, opts.selector);
-  const page = await getRestoredPageForTarget(opts);
-  const label = resolved.ref ?? resolved.selector!;
-  const locator = resolved.ref
-    ? refLocator(page, requireRef(resolved.ref))
-    : page.locator(resolved.selector!);
-  const timeout = resolveInteractionTimeoutMs(opts.timeoutMs);
+
+  const attempt = async () => {
+    const page = await getRestoredPageForTarget(opts);
+    const label = resolved.ref ?? resolved.selector!;
+    const locator = resolved.ref
+      ? refLocator(page, requireRef(resolved.ref))
+      : page.locator(resolved.selector!);
+    const timeout = resolveInteractionTimeoutMs(opts.timeoutMs);
+    try {
+      const delayMs = resolveBoundedDelayMs(opts.delayMs, "click delayMs", MAX_CLICK_DELAY_MS);
+      if (delayMs > 0) {
+        await locator.hover({ timeout });
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+      if (opts.doubleClick) {
+        await locator.dblclick({
+          timeout,
+          button: opts.button,
+          modifiers: opts.modifiers,
+        });
+      } else {
+        await locator.click({
+          timeout,
+          button: opts.button,
+          modifiers: opts.modifiers,
+        });
+      }
+    } catch (err) {
+      throw toAIFriendlyError(err, label);
+    }
+  };
+
   try {
-    const delayMs = resolveBoundedDelayMs(opts.delayMs, "click delayMs", MAX_CLICK_DELAY_MS);
-    if (delayMs > 0) {
-      await locator.hover({ timeout });
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-    if (opts.doubleClick) {
-      await locator.dblclick({
-        timeout,
-        button: opts.button,
-        modifiers: opts.modifiers,
-      });
-    } else {
-      await locator.click({
-        timeout,
-        button: opts.button,
-        modifiers: opts.modifiers,
-      });
-    }
+    await attempt();
   } catch (err) {
-    throw toAIFriendlyError(err, label);
+    if (!isRetryablePlaywrightError(err)) {
+      throw err;
+    }
+    await forceDisconnectPlaywrightForTarget({
+      cdpUrl: opts.cdpUrl,
+      targetId: opts.targetId,
+      reason: "retry click after failure",
+    }).catch(() => {});
+    await new Promise((r) => setTimeout(r, INTERACTION_RETRY_DELAY_MS));
+    await attempt();
   }
 }
 
@@ -225,24 +245,42 @@ export async function typeViaPlaywright(opts: {
 }): Promise<void> {
   const resolved = requireRefOrSelector(opts.ref, opts.selector);
   const text = String(opts.text ?? "");
-  const page = await getRestoredPageForTarget(opts);
-  const label = resolved.ref ?? resolved.selector!;
-  const locator = resolved.ref
-    ? refLocator(page, requireRef(resolved.ref))
-    : page.locator(resolved.selector!);
-  const timeout = resolveInteractionTimeoutMs(opts.timeoutMs);
+
+  const attempt = async () => {
+    const page = await getRestoredPageForTarget(opts);
+    const label = resolved.ref ?? resolved.selector!;
+    const locator = resolved.ref
+      ? refLocator(page, requireRef(resolved.ref))
+      : page.locator(resolved.selector!);
+    const timeout = resolveInteractionTimeoutMs(opts.timeoutMs);
+    try {
+      if (opts.slowly) {
+        await locator.click({ timeout });
+        await locator.type(text, { timeout, delay: 75 });
+      } else {
+        await locator.fill(text, { timeout });
+      }
+      if (opts.submit) {
+        await locator.press("Enter", { timeout });
+      }
+    } catch (err) {
+      throw toAIFriendlyError(err, label);
+    }
+  };
+
   try {
-    if (opts.slowly) {
-      await locator.click({ timeout });
-      await locator.type(text, { timeout, delay: 75 });
-    } else {
-      await locator.fill(text, { timeout });
-    }
-    if (opts.submit) {
-      await locator.press("Enter", { timeout });
-    }
+    await attempt();
   } catch (err) {
-    throw toAIFriendlyError(err, label);
+    if (!isRetryablePlaywrightError(err)) {
+      throw err;
+    }
+    await forceDisconnectPlaywrightForTarget({
+      cdpUrl: opts.cdpUrl,
+      targetId: opts.targetId,
+      reason: "retry type after failure",
+    }).catch(() => {});
+    await new Promise((r) => setTimeout(r, INTERACTION_RETRY_DELAY_MS));
+    await attempt();
   }
 }
 
@@ -298,121 +336,128 @@ export async function evaluateViaPlaywright(opts: {
   if (!fnText) {
     throw new Error("function is required");
   }
-  const page = await getRestoredPageForTarget(opts);
-  // Clamp evaluate timeout to prevent permanently blocking Playwright's command queue.
-  // Without this, a long-running async evaluate blocks all subsequent page operations
-  // because Playwright serializes CDP commands per page.
-  //
-  // NOTE: Playwright's { timeout } on evaluate only applies to installing the function,
-  // NOT to its execution time. We must inject a Promise.race timeout into the browser
-  // context itself so async functions are bounded.
-  const outerTimeout = normalizeTimeoutMs(opts.timeoutMs, 20_000);
-  // Leave headroom for routing/serialization overhead so the outer request timeout
-  // doesn't fire first and strand a long-running evaluate.
-  let evaluateTimeout = Math.max(1000, Math.min(120_000, outerTimeout - 500));
-  evaluateTimeout = Math.min(evaluateTimeout, outerTimeout);
 
-  const signal = opts.signal;
-  let abortListener: (() => void) | undefined;
-  let abortReject: ((reason: unknown) => void) | undefined;
-  let abortPromise: Promise<never> | undefined;
-  if (signal) {
-    abortPromise = new Promise((_, reject) => {
-      abortReject = reject;
-    });
-    // Ensure the abort promise never becomes an unhandled rejection if we throw early.
-    void abortPromise.catch(() => {});
-  }
-  if (signal) {
-    const disconnect = () => {
-      void forceDisconnectPlaywrightForTarget({
-        cdpUrl: opts.cdpUrl,
-        targetId: opts.targetId,
-        reason: "evaluate aborted",
-      }).catch(() => {});
-    };
-    if (signal.aborted) {
-      disconnect();
-      throw signal.reason ?? new Error("aborted");
-    }
-    abortListener = () => {
-      disconnect();
-      abortReject?.(signal.reason ?? new Error("aborted"));
-    };
-    signal.addEventListener("abort", abortListener, { once: true });
-    // If the signal aborted between the initial check and listener registration, handle it.
-    if (signal.aborted) {
-      abortListener();
-      throw signal.reason ?? new Error("aborted");
-    }
-  }
+  const attemptEvaluate = async () => {
+    const page = await getRestoredPageForTarget(opts);
+    const outerTimeout = normalizeTimeoutMs(opts.timeoutMs, 20_000);
+    let evaluateTimeout = Math.max(1000, Math.min(120_000, outerTimeout - 500));
+    evaluateTimeout = Math.min(evaluateTimeout, outerTimeout);
 
-  try {
-    if (opts.ref) {
-      const locator = refLocator(page, opts.ref);
+    const signal = opts.signal;
+    let abortListener: (() => void) | undefined;
+    let abortReject: ((reason: unknown) => void) | undefined;
+    let abortPromise: Promise<never> | undefined;
+    if (signal) {
+      abortPromise = new Promise((_, reject) => {
+        abortReject = reject;
+      });
+      void abortPromise.catch(() => {});
+    }
+    if (signal) {
+      const disconnect = () => {
+        void forceDisconnectPlaywrightForTarget({
+          cdpUrl: opts.cdpUrl,
+          targetId: opts.targetId,
+          reason: "evaluate aborted",
+        }).catch(() => {});
+      };
+      if (signal.aborted) {
+        disconnect();
+        throw signal.reason ?? new Error("aborted");
+      }
+      abortListener = () => {
+        disconnect();
+        abortReject?.(signal.reason ?? new Error("aborted"));
+      };
+      signal.addEventListener("abort", abortListener, { once: true });
+      if (signal.aborted) {
+        abortListener();
+        throw signal.reason ?? new Error("aborted");
+      }
+    }
+
+    try {
+      if (opts.ref) {
+        const locator = refLocator(page, opts.ref);
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval -- required for browser-context eval
+        const elementEvaluator = new Function(
+          "el",
+          "args",
+          `
+          "use strict";
+          var fnBody = args.fnBody, timeoutMs = args.timeoutMs;
+          try {
+            var candidate = eval("(" + fnBody + ")");
+            var result = typeof candidate === "function" ? candidate(el) : candidate;
+            if (result && typeof result.then === "function") {
+              return Promise.race([
+                result,
+                new Promise(function(_, reject) {
+                  setTimeout(function() { reject(new Error("evaluate timed out after " + timeoutMs + "ms")); }, timeoutMs);
+                })
+              ]);
+            }
+            return result;
+          } catch (err) {
+            throw new Error("Invalid evaluate function: " + (err && err.message ? err.message : String(err)));
+          }
+          `,
+        ) as (el: Element, args: { fnBody: string; timeoutMs: number }) => unknown;
+        const evalPromise = locator.evaluate(elementEvaluator, {
+          fnBody: fnText,
+          timeoutMs: evaluateTimeout,
+        });
+        return await awaitEvalWithAbort(evalPromise, abortPromise);
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-implied-eval -- required for browser-context eval
-      const elementEvaluator = new Function(
-        "el",
+      const browserEvaluator = new Function(
         "args",
         `
-        "use strict";
-        var fnBody = args.fnBody, timeoutMs = args.timeoutMs;
-        try {
-          var candidate = eval("(" + fnBody + ")");
-          var result = typeof candidate === "function" ? candidate(el) : candidate;
-          if (result && typeof result.then === "function") {
-            return Promise.race([
-              result,
-              new Promise(function(_, reject) {
-                setTimeout(function() { reject(new Error("evaluate timed out after " + timeoutMs + "ms")); }, timeoutMs);
-              })
-            ]);
+          "use strict";
+          var fnBody = args.fnBody, timeoutMs = args.timeoutMs;
+          try {
+            var candidate = eval("(" + fnBody + ")");
+            var result = typeof candidate === "function" ? candidate() : candidate;
+            if (result && typeof result.then === "function") {
+              return Promise.race([
+                result,
+                new Promise(function(_, reject) {
+                  setTimeout(function() { reject(new Error("evaluate timed out after " + timeoutMs + "ms")); }, timeoutMs);
+                })
+              ]);
+            }
+            return result;
+          } catch (err) {
+            throw new Error("Invalid evaluate function: " + (err && err.message ? err.message : String(err)));
           }
-          return result;
-        } catch (err) {
-          throw new Error("Invalid evaluate function: " + (err && err.message ? err.message : String(err)));
-        }
         `,
-      ) as (el: Element, args: { fnBody: string; timeoutMs: number }) => unknown;
-      const evalPromise = locator.evaluate(elementEvaluator, {
+      ) as (args: { fnBody: string; timeoutMs: number }) => unknown;
+      const evalPromise = page.evaluate(browserEvaluator, {
         fnBody: fnText,
         timeoutMs: evaluateTimeout,
       });
       return await awaitEvalWithAbort(evalPromise, abortPromise);
+    } finally {
+      if (signal && abortListener) {
+        signal.removeEventListener("abort", abortListener);
+      }
     }
+  };
 
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval -- required for browser-context eval
-    const browserEvaluator = new Function(
-      "args",
-      `
-        "use strict";
-        var fnBody = args.fnBody, timeoutMs = args.timeoutMs;
-        try {
-          var candidate = eval("(" + fnBody + ")");
-          var result = typeof candidate === "function" ? candidate() : candidate;
-          if (result && typeof result.then === "function") {
-            return Promise.race([
-              result,
-              new Promise(function(_, reject) {
-                setTimeout(function() { reject(new Error("evaluate timed out after " + timeoutMs + "ms")); }, timeoutMs);
-              })
-            ]);
-          }
-          return result;
-        } catch (err) {
-          throw new Error("Invalid evaluate function: " + (err && err.message ? err.message : String(err)));
-        }
-      `,
-    ) as (args: { fnBody: string; timeoutMs: number }) => unknown;
-    const evalPromise = page.evaluate(browserEvaluator, {
-      fnBody: fnText,
-      timeoutMs: evaluateTimeout,
-    });
-    return await awaitEvalWithAbort(evalPromise, abortPromise);
-  } finally {
-    if (signal && abortListener) {
-      signal.removeEventListener("abort", abortListener);
+  try {
+    return await attemptEvaluate();
+  } catch (err) {
+    if (!isRetryablePlaywrightError(err)) {
+      throw err;
     }
+    await forceDisconnectPlaywrightForTarget({
+      cdpUrl: opts.cdpUrl,
+      targetId: opts.targetId,
+      reason: "retry evaluate after failure",
+    }).catch(() => {});
+    await new Promise((r) => setTimeout(r, INTERACTION_RETRY_DELAY_MS));
+    return await attemptEvaluate();
   }
 }
 

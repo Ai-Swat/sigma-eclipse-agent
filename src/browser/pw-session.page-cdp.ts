@@ -55,6 +55,7 @@ export async function withPageScopedCdpClient<T>(opts: {
   cdpUrl: string;
   page: Page;
   targetId?: string;
+  commandTimeoutMs?: number;
   fn: (send: PageCdpSend) => Promise<T>;
 }): Promise<T> {
   const targetId = opts.targetId?.trim();
@@ -63,9 +64,13 @@ export async function withPageScopedCdpClient<T>(opts: {
     if (!wsUrl) {
       throw new Error("CDP websocket unavailable");
     }
-    return await withCdpSocket(wsUrl, async (send) => {
-      return await opts.fn((method, params) => send(method, { ...params, targetId }));
-    });
+    return await withCdpSocket(
+      wsUrl,
+      async (send) => {
+        return await opts.fn((method, params) => send(method, { ...params, targetId }));
+      },
+      { commandTimeoutMs: opts.commandTimeoutMs },
+    );
   }
 
   return await withPlaywrightPageCdpSession(opts.page, async (session) => {
