@@ -85,6 +85,7 @@ const api: OpenclawDesktopApi = {
   installUpdate: async () => ipcRenderer.invoke(IPC.updaterInstall),
   onUpdateAvailable: (cb: (payload: UpdateAvailablePayload) => void) =>
     onIpc(IPC_EVENTS.updaterAvailable, cb),
+  onUpdateNotAvailable: (cb: () => void) => onIpc(IPC_EVENTS.updaterNotAvailable, cb),
   onUpdateDownloadProgress: (cb: (payload: UpdateDownloadProgressPayload) => void) =>
     onIpc(IPC_EVENTS.updaterDownloadProgress, cb),
   onUpdateDownloaded: (cb: (payload: UpdateDownloadedPayload) => void) =>

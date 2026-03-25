@@ -38,22 +38,51 @@ export async function snapshotAriaViaPlaywright(opts: {
       targetId: opts.targetId,
     });
     ensurePageState(page);
-    const res = (await withPageScopedCdpClient({
+    const formatted = await withPageScopedCdpClient({
       cdpUrl: opts.cdpUrl,
       page,
       targetId: opts.targetId,
       commandTimeoutMs: 55_000,
       fn: async (send) => {
         await send("Accessibility.enable").catch(() => {});
-        return (await send("Accessibility.getFullAXTree")) as {
+        const axTree = (await send("Accessibility.getFullAXTree")) as {
           nodes?: RawAXNode[];
         };
+        const rawNodes = Array.isArray(axTree?.nodes) ? axTree.nodes : [];
+        const nodes = formatAriaSnapshot(rawNodes, limit);
+
+        // Inject data-oc-ref attributes so ax\d+ refs work with Playwright locators.
+        const withBackendId = nodes.filter(
+          (n): n is AriaSnapshotNode & { backendDOMNodeId: number } =>
+            typeof n.backendDOMNodeId === "number" && n.backendDOMNodeId > 0,
+        );
+        if (withBackendId.length > 0) {
+          try {
+            await send("DOM.getDocument", { depth: 0 });
+            const { nodeIds } = (await send("DOM.pushNodesByBackendIdsToFrontend", {
+              backendNodeIds: withBackendId.map((n) => n.backendDOMNodeId),
+            })) as { nodeIds: number[] };
+            const setOps = nodeIds
+              .map((nodeId, i) =>
+                nodeId > 0
+                  ? send("DOM.setAttributeValue", {
+                      nodeId,
+                      name: "data-oc-ref",
+                      value: withBackendId[i].ref,
+                    }).catch(() => {})
+                  : undefined,
+              )
+              .filter(Boolean);
+            await Promise.all(setOps);
+          } catch {
+            // Best-effort: if DOM injection fails, aria refs won't be interactive
+          }
+        }
+
+        return nodes;
       },
-    })) as {
-      nodes?: RawAXNode[];
-    };
-    const nodes = Array.isArray(res?.nodes) ? res.nodes : [];
-    return { nodes: formatAriaSnapshot(nodes, limit) };
+    });
+    return { nodes: formatted };
   };
 
   try {

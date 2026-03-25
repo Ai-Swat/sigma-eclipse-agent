@@ -97,6 +97,7 @@ export interface OpenclawDesktopApi {
   downloadUpdate: () => Promise<void>;
   installUpdate: () => Promise<void>;
   onUpdateAvailable: (cb: (payload: UpdateAvailablePayload) => void) => () => void;
+  onUpdateNotAvailable: (cb: () => void) => () => void;
   onUpdateDownloadProgress: (cb: (payload: UpdateDownloadProgressPayload) => void) => () => void;
   onUpdateDownloaded: (cb: (payload: UpdateDownloadedPayload) => void) => () => void;
   onUpdateError: (cb: (payload: UpdateErrorPayload) => void) => () => void;
@@ -250,6 +251,7 @@ export const DESKTOP_BRIDGE_KEYS: ReadonlyArray<keyof OpenclawDesktopApi> = [
   "downloadUpdate",
   "installUpdate",
   "onUpdateAvailable",
+  "onUpdateNotAvailable",
   "onUpdateDownloadProgress",
   "onUpdateDownloaded",
   "onUpdateError",

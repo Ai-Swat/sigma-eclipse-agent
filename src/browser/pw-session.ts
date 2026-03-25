@@ -540,6 +540,11 @@ export function refLocator(page: Page, ref: string) {
       ? ref.slice(4)
       : ref;
 
+  // ax\d+ refs from aria snapshot format — injected as data-oc-ref DOM attributes
+  if (/^ax\d+$/.test(normalized)) {
+    return page.locator(`[data-oc-ref="${normalized}"]`);
+  }
+
   if (/^e\d+$/.test(normalized)) {
     const state = pageStates.get(page);
     if (state?.roleRefsMode === "aria") {

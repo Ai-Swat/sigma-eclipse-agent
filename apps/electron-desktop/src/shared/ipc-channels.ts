@@ -111,6 +111,7 @@ export const IPC_EVENTS = {
   gatewayState: "gateway-state",
   oauthProgress: "oauth:progress",
   updaterAvailable: "updater-available",
+  updaterNotAvailable: "updater-not-available",
   updaterDownloadProgress: "updater-download-progress",
   updaterDownloaded: "updater-downloaded",
   updaterError: "updater-error",

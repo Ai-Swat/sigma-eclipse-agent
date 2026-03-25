@@ -15,12 +15,20 @@ import { RestoreBackupModal } from "./RestoreBackupModal";
 import s from "./OtherTab.module.css";
 import pkg from "../../../../package.json";
 
+type UpdateCheckState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "available"; version: string }
+  | { kind: "up-to-date" }
+  | { kind: "error"; message: string };
+
 export function OtherTab({ onError }: { onError: (msg: string | null) => void }) {
   const [launchAtStartup, setLaunchAtStartup] = React.useState(false);
   const [resetBusy, setResetBusy] = React.useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = React.useState(false);
   const [backupBusy, setBackupBusy] = React.useState(false);
   const [restoreModalOpen, setRestoreModalOpen] = React.useState(false);
+  const [updateCheck, setUpdateCheck] = React.useState<UpdateCheckState>({ kind: "idle" });
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const gw = useGatewayRpc();
@@ -35,6 +43,52 @@ export function OtherTab({ onError }: { onError: (msg: string | null) => void })
     }
     void api.getLaunchAtLogin().then((res) => setLaunchAtStartup(res.enabled));
   }, []);
+
+  React.useEffect(() => {
+    const api = getDesktopApiOrNull();
+    if (!api) {
+      return;
+    }
+    const unsubs: Array<() => void> = [];
+    unsubs.push(
+      api.onUpdateAvailable((payload) => {
+        setUpdateCheck({ kind: "available", version: payload.version });
+      })
+    );
+    unsubs.push(
+      api.onUpdateNotAvailable(() => {
+        setUpdateCheck({ kind: "up-to-date" });
+        setTimeout(
+          () => setUpdateCheck((prev) => (prev.kind === "up-to-date" ? { kind: "idle" } : prev)),
+          5000
+        );
+      })
+    );
+    unsubs.push(
+      api.onUpdateError((payload) => {
+        setUpdateCheck((prev) =>
+          prev.kind === "checking" ? { kind: "error", message: payload.message } : prev
+        );
+      })
+    );
+    return () => {
+      for (const unsub of unsubs) unsub();
+    };
+  }, []);
+
+  const handleCheckForUpdates = React.useCallback(async () => {
+    const api = getDesktopApiOrNull();
+    if (!api?.checkForUpdate) {
+      onError("Desktop API not available");
+      return;
+    }
+    setUpdateCheck({ kind: "checking" });
+    try {
+      await api.checkForUpdate();
+    } catch (err) {
+      setUpdateCheck({ kind: "error", message: errorToMessage(err) });
+    }
+  }, [onError]);
 
   const toggleLaunchAtStartup = React.useCallback(
     async (enabled: boolean) => {
@@ -149,6 +203,39 @@ export function OtherTab({ onError }: { onError: (msg: string | null) => void })
             >
               PolyForm Noncommercial 1.0.0
             </button>
+          </div>
+          <div className={s.UiSettingsOtherRow}>
+            <span className={s.UiSettingsOtherRowLabel}>Updates</span>
+            <span className={s.UiSettingsOtherAppRowValue}>
+              {updateCheck.kind === "idle" && (
+                <button
+                  type="button"
+                  className={s.UiSettingsOtherLink}
+                  onClick={() => void handleCheckForUpdates()}
+                >
+                  Check for updates
+                </button>
+              )}
+              {updateCheck.kind === "checking" && (
+                <span className={s.UiSettingsOtherRowValue}>Checking…</span>
+              )}
+              {updateCheck.kind === "up-to-date" && (
+                <span className={s.UiSettingsOtherRowValue}>You're up to date</span>
+              )}
+              {updateCheck.kind === "available" && (
+                <span className={s.UiSettingsOtherRowValue}>v{updateCheck.version} available</span>
+              )}
+              {updateCheck.kind === "error" && (
+                <button
+                  type="button"
+                  className={s.UiSettingsOtherLink}
+                  onClick={() => void handleCheckForUpdates()}
+                  title={updateCheck.message}
+                >
+                  Retry
+                </button>
+              )}
+            </span>
           </div>
         </div>
       </section>
