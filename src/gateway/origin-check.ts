@@ -7,9 +7,17 @@ type OriginCheckResult =
     }
   | { ok: false; reason: string };
 
-function parseOrigin(
-  originRaw?: string,
-): { origin: string; host: string; hostname: string } | null {
+type ParsedOrigin = {
+  /** WHATWG-serialized origin (lowercased). For non-special schemes this is `"null"`. */
+  origin: string;
+  /** Original lowercased `<scheme>://<host>` form preserved verbatim from the header. */
+  serialized: string;
+  host: string;
+  hostname: string;
+  protocol: string;
+};
+
+function parseOrigin(originRaw?: string): ParsedOrigin | null {
   const trimmed = (originRaw ?? "").trim();
   if (!trimmed || trimmed === "null") {
     return null;
@@ -18,8 +26,10 @@ function parseOrigin(
     const url = new URL(trimmed);
     return {
       origin: url.origin.toLowerCase(),
+      serialized: trimmed.toLowerCase(),
       host: url.host.toLowerCase(),
       hostname: url.hostname.toLowerCase(),
+      protocol: url.protocol.toLowerCase(),
     };
   } catch {
     return null;
@@ -43,6 +53,20 @@ export function checkBrowserOrigin(params: {
   );
   if (allowlist.has("*") || allowlist.has(parsedOrigin.origin)) {
     return { ok: true, matchedBy: "allowlist" };
+  }
+
+  // For non-special schemes (chrome-extension://, moz-extension://, file://, ...),
+  // WHATWG URL serializes `.origin` as the literal string "null", which means a
+  // configured allowlist entry like `chrome-extension://<id>` would never match
+  // unless the operator additionally added the magic string `"null"`. Match the
+  // entry against the original `<scheme>://<host>` form so the natural
+  // configuration works as expected. (HTTP/HTTPS still go through the strict
+  // serialized-origin path above.)
+  if (parsedOrigin.origin === "null" && parsedOrigin.host) {
+    const literal = `${parsedOrigin.protocol}//${parsedOrigin.host}`;
+    if (allowlist.has(literal)) {
+      return { ok: true, matchedBy: "allowlist" };
+    }
   }
 
   const requestHost = normalizeHostHeader(params.requestHost);

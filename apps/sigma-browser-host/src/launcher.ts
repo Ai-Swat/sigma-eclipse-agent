@@ -30,8 +30,11 @@ import {
 import { runConfigMigrations } from "@electron-main/gateway/config-migrations";
 import {
   killOrphanedGateway,
-  removeStaleGatewayLock,
+  killOrphanedLauncher,
   removeGatewayPid,
+  removeLauncherPid,
+  removeStaleGatewayLock,
+  writeLauncherPid,
 } from "@electron-main/gateway/pid-file";
 import { removeGatewayInfoFile } from "@electron-main/gateway/gateway-info-file";
 import { createTailBuffer, pickPort } from "@electron-main/util/net";
@@ -95,7 +98,23 @@ async function main(): Promise<void> {
   console.log(`${LOG_PREFIX} nodeBin=${nodeBin}`);
 
   // 1. Orphan cleanup.
+  //
+  // Two layers:
+  //   a) a previous *launcher* process (this binary) may still be alive and
+  //      holding the discovery port (19999). If we don't kill it, `listen`
+  //      below fails with EADDRINUSE and the extension can never discover
+  //      the new gateway. See sigma/browser/gateway/README.md.
+  //   b) the gateway *child* (openclaw.mjs) is tracked separately via its
+  //      own PID file, because (a) kills the launcher tree which normally
+  //      takes the gateway with it, but a crashed launcher may leak the
+  //      child too.
   try {
+    const killedLauncherPid = killOrphanedLauncher(stateDir);
+    if (killedLauncherPid != null) {
+      console.log(
+        `${LOG_PREFIX} killed orphan launcher pid=${killedLauncherPid}`
+      );
+    }
     const killedPid = killOrphanedGateway(stateDir);
     if (killedPid != null) {
       console.log(`${LOG_PREFIX} killed orphan gateway pid=${killedPid}`);
@@ -104,6 +123,10 @@ async function main(): Promise<void> {
   } catch (err) {
     console.warn(`${LOG_PREFIX} orphan cleanup failed:`, err);
   }
+
+  // Record our own PID so the *next* launcher can detect us if we die
+  // uncleanly.
+  writeLauncherPid(stateDir, process.pid);
 
   // 2. Pick the actual gateway port (prefer the requested one, fall back to
   //    a random free port).
@@ -117,16 +140,15 @@ async function main(): Promise<void> {
   ensureGatewayConfigFile({ configPath, token });
   runConfigMigrations({ configPath, stateDir });
 
-  // 4. Patch sigma-local provider with the current llama-server port.
+  // 4. Patch sigma-local provider with the current llama-server port + keep
+  //    profiles.user.cdpUrl in sync with the derived extension-relay port.
+  //    Run even without --llama-port so the browser-profile half still executes
+  //    (e.g. cloud-model setups where the extension still needs the relay).
   const llamaPort = llamaPortArg ? parseIntOr(llamaPortArg, 0) : 0;
-  if (llamaPort > 0) {
-    patchSigmaLocalProvider({ configPath, llamaPort });
-    console.log(`${LOG_PREFIX} sigma-local provider patched -> llamaPort=${llamaPort}`);
-  } else {
-    console.warn(
-      `${LOG_PREFIX} no --llama-port provided; sigma-local provider will not be patched`
-    );
-  }
+  await patchSigmaLocalProvider({ configPath, llamaPort, gatewayPort: port });
+  console.log(
+    `${LOG_PREFIX} sigma-local config patched -> llamaPort=${llamaPort} gatewayPort=${port}`
+  );
 
   // 5. Discovery server (fixed loopback port).
   let discovery: DiscoveryServer | null = null;
@@ -191,6 +213,11 @@ async function main(): Promise<void> {
     }
     try {
       await discovery?.close();
+    } catch {
+      // best effort
+    }
+    try {
+      removeLauncherPid(stateDir);
     } catch {
       // best effort
     }

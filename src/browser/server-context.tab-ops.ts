@@ -3,6 +3,7 @@ import { fetchJson, fetchOk, normalizeCdpHttpBaseForJsonEndpoints } from "./cdp.
 import { appendCdpPath, createTargetViaCdp, normalizeCdpWsUrl } from "./cdp.js";
 import { listChromeMcpTabs, openChromeMcpTab } from "./chrome-mcp.js";
 import type { ResolvedBrowserProfile } from "./config.js";
+import { BrowserProfileUnavailableError } from "./errors.js";
 import {
   assertBrowserNavigationAllowed,
   assertBrowserNavigationResultAllowed,
@@ -56,6 +57,53 @@ type CdpTarget = {
   webSocketDebuggerUrl?: string;
   type?: string;
 };
+
+function describeError(err: unknown): string {
+  if (err == null) {
+    return "";
+  }
+  if (err instanceof Error) {
+    return err.message || String(err);
+  }
+  if (typeof err === "string") {
+    return err;
+  }
+  if (typeof err === "number" || typeof err === "boolean" || typeof err === "bigint") {
+    return String(err);
+  }
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return Object.prototype.toString.call(err);
+  }
+}
+
+/**
+ * The HTTP `PUT /json/new` fallback is a last resort when the WebSocket
+ * `Target.createTarget` path cannot create a tab. When it also fails (most
+ * commonly with `HTTP 404` from the Sigma extension relay, which does not
+ * implement `/json/new`), surface a single human-friendly error that explains
+ * the likely cause instead of the bare `HTTP 404`.
+ */
+function wrapOpenTabFallbackError(args: {
+  err: unknown;
+  cdpUrl: string;
+  profileName: string;
+  cdpCreateError: unknown;
+}): BrowserProfileUnavailableError {
+  const fallback = describeError(args.err);
+  const cdp = describeError(args.cdpCreateError);
+  const looksLike404 = fallback.includes("HTTP 404") || /404/.test(fallback);
+  const headline = looksLike404
+    ? `cannot open a new tab in profile "${args.profileName}": the browser at ${args.cdpUrl} did not accept the request`
+    : `cannot open a new tab in profile "${args.profileName}" (${args.cdpUrl}): ${fallback}`;
+  const hint =
+    "open or focus a tab in the target browser and ensure the Sigma extension (or the underlying Chromium DevTools) is connected, then retry";
+  const details = cdp ? ` [cdp: ${cdp}; fallback: ${fallback}]` : ` [fallback: ${fallback}]`;
+  return new BrowserProfileUnavailableError(`${headline} — ${hint}${details}`, {
+    cause: args.err instanceof Error ? args.err : undefined,
+  });
+}
 
 export function createProfileTabOps({
   profile,
@@ -175,13 +223,17 @@ export function createProfileTabOps({
       );
     }
 
+    let cdpCreateError: unknown = null;
     const createdViaCdp = await createTargetViaCdp({
       cdpUrl: profile.cdpUrl,
       url,
       ...ssrfPolicyOpts,
     })
       .then((r) => r.targetId)
-      .catch(() => null);
+      .catch((err) => {
+        cdpCreateError = err;
+        return null;
+      });
 
     if (createdViaCdp) {
       const profileState = getProfileState();
@@ -212,12 +264,21 @@ export function createProfileTabOps({
       : `${endpointUrl.toString()}?${encoded}`;
     const created = await fetchJson<CdpTarget>(endpoint, CDP_JSON_NEW_TIMEOUT_MS, {
       method: "PUT",
-    }).catch(async (err) => {
-      if (String(err).includes("HTTP 405")) {
-        return await fetchJson<CdpTarget>(endpoint, CDP_JSON_NEW_TIMEOUT_MS);
-      }
-      throw err;
-    });
+    })
+      .catch(async (err) => {
+        if (String(err).includes("HTTP 405")) {
+          return await fetchJson<CdpTarget>(endpoint, CDP_JSON_NEW_TIMEOUT_MS);
+        }
+        throw err;
+      })
+      .catch((err) => {
+        throw wrapOpenTabFallbackError({
+          err,
+          cdpUrl: profile.cdpUrl,
+          profileName: profile.name,
+          cdpCreateError,
+        });
+      });
 
     if (!created.id) {
       throw new Error("Failed to open tab (missing id)");

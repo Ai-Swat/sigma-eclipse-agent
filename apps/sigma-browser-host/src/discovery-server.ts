@@ -93,17 +93,53 @@ export async function startDiscoveryServer(params: {
     res.end();
   });
 
-  const bound = await new Promise<number>((resolve, reject) => {
-    server.once("error", (err) => reject(err));
-    server.listen(params.preferredPort, "127.0.0.1", () => {
-      const addr = server.address();
-      if (!addr || typeof addr === "string") {
-        reject(new Error("failed to resolve discovery port"));
-        return;
-      }
-      resolve(addr.port);
+  // Retry on EADDRINUSE: a freshly-killed orphan launcher may still hold the
+  // socket for a few ms while the kernel tears it down (TIME_WAIT / close
+  // races). Without this, a cold start right after a browser crash reliably
+  // fails with EADDRINUSE even though we just killed the predecessor.
+  const MAX_ATTEMPTS = 6;
+  const RETRY_DELAY_MS = 250;
+
+  const tryListen = (): Promise<number> =>
+    new Promise<number>((resolve, reject) => {
+      const onError = (err: NodeJS.ErrnoException) => {
+        server.removeListener("listening", onListening);
+        reject(err);
+      };
+      const onListening = () => {
+        server.removeListener("error", onError);
+        const addr = server.address();
+        if (!addr || typeof addr === "string") {
+          reject(new Error("failed to resolve discovery port"));
+          return;
+        }
+        resolve(addr.port);
+      };
+      server.once("error", onError);
+      server.once("listening", onListening);
+      server.listen(params.preferredPort, "127.0.0.1");
     });
-  });
+
+  let bound = 0;
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      bound = await tryListen();
+      break;
+    } catch (err) {
+      lastErr = err;
+      const code = (err as NodeJS.ErrnoException | null)?.code;
+      if (code !== "EADDRINUSE" || attempt === MAX_ATTEMPTS - 1) {
+        throw err;
+      }
+      await new Promise<void>((r) => setTimeout(r, RETRY_DELAY_MS));
+    }
+  }
+  if (bound === 0) {
+    throw (lastErr instanceof Error
+      ? lastErr
+      : new Error(`discovery failed to bind on 127.0.0.1:${params.preferredPort}`));
+  }
 
   return {
     port: bound,

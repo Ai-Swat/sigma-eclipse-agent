@@ -12,7 +12,7 @@ import {
 describe("browser control server", () => {
   installBrowserControlServerHooks();
 
-  it("POST /tabs/open?profile=unknown returns 404", async () => {
+  it("POST /tabs/open?profile=unknown returns 400 with available profiles", async () => {
     await startBrowserControlServerFromConfig();
     const base = getBrowserControlServerBaseUrl();
 
@@ -21,9 +21,15 @@ describe("browser control server", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: "https://example.com" }),
     });
-    expect(result.status).toBe(404);
+    // Explicitly-supplied unknown profile is a client mistake (400), not a
+    // missing-resource (404). The error must list the available profiles so
+    // the caller can recover. The error message is the bare message (no
+    // class-name prefix like "BrowserProfileNotFoundError:").
+    expect(result.status).toBe(400);
     const body = (await result.json()) as { error: string };
     expect(body.error).toContain("not found");
+    expect(body.error).toContain("Available profiles:");
+    expect(body.error).not.toContain("BrowserProfileNotFoundError");
   });
 
   it("POST /tabs/open returns 400 for invalid URLs", async () => {

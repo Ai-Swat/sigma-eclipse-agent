@@ -9,14 +9,32 @@ import JSON5 from "json5";
  *      differ between launches if the preferred port was taken).
  *   2. Ensure at least one agent is defaulted to `sigma-local/<model>` so
  *      the extension can chat out-of-the-box without cloud keys.
+ *   3. Keep `browser.profiles.user.cdpUrl` in sync with the live gateway port.
+ *      Migration v5 seeds this profile with a hardcoded legacy port (18792)
+ *      that predates the current derive-from-gateway-port contract. The
+ *      Sigma Eclipse extension always connects to `gateway.port + 3`
+ *      (RELAY_PORT_OFFSET), which must match the `cdpUrl` the gateway uses
+ *      to spawn the extension-relay HTTP/WS server. Without this patch, the
+ *      extension ends up attached to a second relay (auto-created as
+ *      `chrome-relay` profile) while the agent routes through the stale
+ *      `user` profile — they don't meet, and `browser` tool calls fail with
+ *      `CDP /json/version missing webSocketDebuggerUrl; fallback: HTTP 404`.
  */
-export function patchSigmaLocalProvider(params: {
+export async function patchSigmaLocalProvider(params: {
   configPath: string;
   llamaPort: number;
+  gatewayPort?: number;
   modelId?: string;
-}): void {
-  const { configPath, llamaPort, modelId } = params;
+}): Promise<void> {
+  const { configPath, llamaPort, gatewayPort, modelId } = params;
   if (!fs.existsSync(configPath)) {return;}
+
+  // Try to discover the actually-loaded model + its server-side n_ctx from
+  // llama-server. This keeps the OpenClaw config honest across model switches
+  // (e.g. the user swaps gemma-3-1b-it for gemma-4-26B-A4B-it) without
+  // requiring a manual patcher change. Falls back gracefully if the server is
+  // not reachable (first-launch / port contention).
+  const live = await probeLlamaServer(llamaPort);
 
   let cfg: Record<string, unknown>;
   try {
@@ -44,17 +62,94 @@ export function patchSigmaLocalProvider(params: {
     changed = true;
   }
 
+  // Allow the Sigma Eclipse browser extension to open the gateway WebSocket.
+  //
+  // Node.js (the gateway runtime) reports `URL.origin` as the literal string
+  // "null" for any non-special scheme — `chrome-extension://<id>` included.
+  // That means `allowedOrigins: ["null"]` (upstream OpenClaw's default seed)
+  // already matches browser-extension connections on the server side; the
+  // textual `chrome-extension://<id>` entry never matches in Node's URL
+  // parser. We therefore:
+  //   1. Keep `"null"` if present (removing it silently breaks the extension),
+  //   2. Additionally record the deterministic extension origin so the
+  //      allowlist is self-documenting and ready for a future origin-check
+  //      impl that parses chrome-extension:// schemes explicitly.
+  //
+  // Additional ids for unpacked dev builds with a different `key` can be
+  // supplied via env: SIGMA_BROWSER_EXTENSION_IDS=id1,id2 (comma-separated).
+  const controlUi = ensureObject(gateway, "controlUi");
+  const requiredExtensionOrigins = collectRequiredExtensionOrigins();
+  const existingOrigins = Array.isArray(controlUi.allowedOrigins)
+    ? (controlUi.allowedOrigins as unknown[]).filter(
+        (v): v is string => typeof v === "string",
+      )
+    : [];
+  const merged = mergeOrigins(existingOrigins, requiredExtensionOrigins);
+  if (merged.changed) {
+    controlUi.allowedOrigins = merged.origins;
+    changed = true;
+  }
+
+  // Sync browser.profiles.user.cdpUrl with the live gateway port.
+  //
+  // Contract:
+  //   - The Sigma Eclipse extension (background/background.ts) computes the
+  //     extension-relay port as `gateway.port + RELAY_PORT_OFFSET` where
+  //     RELAY_PORT_OFFSET = 3. That's where `chrome.tabs.create`-style
+  //     CDP commands flow.
+  //   - OpenClaw spawns an extension-relay server at whatever port the
+  //     profile's `cdpUrl` points to. The built-in `chrome-relay` profile
+  //     uses the same derived port by design
+  //     (src/browser/config.ts:ensureDefaultChromeRelayProfile).
+  //   - If `profiles.user.cdpUrl` disagrees, we end up with two relays: the
+  //     extension attaches to one, the agent queries the other, and the
+  //     connection silently fails.
+  //
+  // Historical note: migration v5 seeds the `user` profile with a hardcoded
+  // `http://127.0.0.1:18792`, which is the legacy default from a time when
+  // the gateway had no fixed port and the extension used a fixed
+  // DEFAULT_PORT constant. Now that Sigma runs the gateway on a known port
+  // (`--gateway-port`), we can — and must — derive the relay URL from it.
+  if (typeof gatewayPort === "number" && Number.isFinite(gatewayPort) && gatewayPort > 0) {
+    const browser = ensureObject(cfg, "browser");
+    const profiles = ensureObject(browser, "profiles");
+    const user = asPlainObject(profiles.user);
+    const expectedRelayPort = gatewayPort + 3;
+    const expectedCdpUrl = `http://127.0.0.1:${expectedRelayPort}`;
+    if (user && user.driver === "extension" && user.cdpUrl !== expectedCdpUrl) {
+      user.cdpUrl = expectedCdpUrl;
+      changed = true;
+    }
+  }
+
+  // LLM provider + default-agent wiring. Skipped when we don't yet know the
+  // llama-server port — writing `http://127.0.0.1:0/v1` would poison the
+  // config and force the user to delete it by hand. The browser-profile
+  // patch above still ran, so relay routing is kept in sync regardless.
+  if (llamaPort > 0) {
   const models = ensureObject(cfg, "models");
   const providers = ensureObject(models, "providers");
   const existing = asPlainObject(providers["sigma-local"]);
 
-  const resolvedModelId = modelId ?? extractModelIdFromProvider(existing) ?? "gemma-3-1b-it";
+  // Preference order: explicit param > live llama-server > whatever is already
+  // in config > hardcoded fallback. The live probe wins over the stale config
+  // entry so that swapping models in llama-server is reflected automatically.
+  const resolvedModelId =
+    modelId ??
+    live?.modelId ??
+    extractModelIdFromProvider(existing) ??
+    "gemma-3-1b-it";
   const expectedBaseUrl = `http://127.0.0.1:${llamaPort}/v1`;
 
   // OpenClaw requires a minimum context window of 16000 tokens, otherwise it
   // rejects the model with `FailoverError: Model context window too small`.
   // llama-server must be started with a matching `-c` (or larger) value.
   const MIN_CTX = 16384;
+  // Use the live per-slot ctx when available (llama-server splits `-c N` by
+  // `--parallel` slots — a chat request only sees n_ctx/slots tokens). Clamp
+  // to the OpenClaw minimum so we never advertise a window the gateway will
+  // reject.
+  const resolvedCtx = Math.max(MIN_CTX, live?.ctxPerSlot ?? MIN_CTX);
 
   if (!existing) {
     providers["sigma-local"] = {
@@ -62,7 +157,7 @@ export function patchSigmaLocalProvider(params: {
       api: "openai-completions",
       apiKey: "no-key",
       models: [
-        { id: resolvedModelId, name: resolvedModelId, contextWindow: MIN_CTX },
+        { id: resolvedModelId, name: resolvedModelId, contextWindow: resolvedCtx },
       ],
     };
     changed = true;
@@ -71,11 +166,30 @@ export function patchSigmaLocalProvider(params: {
       existing.baseUrl = expectedBaseUrl;
       changed = true;
     }
-    // Backfill `name` / bump `contextWindow` on any model entry — required by
-    // the OpenClaw Zod schema (ModelDefinitionSchema) + runtime gatekeeping.
     const existingModels = existing.models;
-    if (Array.isArray(existingModels)) {
-      for (const m of existingModels) {
+    if (Array.isArray(existingModels) && existingModels.length > 0) {
+      // If the live model id differs from what's recorded, replace the entry
+      // wholesale — keeping a stale `id` would cause the extension to request
+      // a model name that llama-server no longer serves.
+      const first = existingModels[0];
+      if (isPlainObject(first)) {
+        if (typeof first.id !== "string" || first.id !== resolvedModelId) {
+          first.id = resolvedModelId;
+          first.name = resolvedModelId;
+          changed = true;
+        }
+        if (typeof first.name !== "string") {
+          first.name = resolvedModelId;
+          changed = true;
+        }
+        const ctx = first.contextWindow;
+        if (typeof ctx !== "number" || ctx !== resolvedCtx) {
+          first.contextWindow = resolvedCtx;
+          changed = true;
+        }
+      }
+      for (let i = 1; i < existingModels.length; i++) {
+        const m = existingModels[i];
         if (!isPlainObject(m)) {continue;}
         if (typeof m.name !== "string" && typeof m.id === "string") {
           m.name = m.id;
@@ -87,6 +201,11 @@ export function patchSigmaLocalProvider(params: {
           changed = true;
         }
       }
+    } else {
+      existing.models = [
+        { id: resolvedModelId, name: resolvedModelId, contextWindow: resolvedCtx },
+      ];
+      changed = true;
     }
   }
 
@@ -94,14 +213,89 @@ export function patchSigmaLocalProvider(params: {
   const defaults = ensureObject(agents, "defaults");
   const model = asPlainObject(defaults.model);
   const primaryKey = `sigma-local/${resolvedModelId}`;
-  if (!model || typeof model.primary !== "string") {
-    defaults.model = { primary: primaryKey };
+  // Force the primary agent model to match the live llama-server model. If we
+  // only set it when missing, a stale `sigma-local/gemma-3-1b-it` would keep
+  // the agent routing to a model that's no longer served.
+  if (!model || model.primary !== primaryKey) {
+    defaults.model = { ...model, primary: primaryKey };
     changed = true;
+  }
   }
 
   if (changed) {
     fs.writeFileSync(configPath, `${JSON.stringify(cfg, null, 2)}\n`, "utf-8");
   }
+}
+
+interface LiveLlamaInfo {
+  modelId: string | null;
+  ctxPerSlot: number | null;
+}
+
+async function probeLlamaServer(port: number): Promise<LiveLlamaInfo | null> {
+  if (!port || port <= 0) {return null;}
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    const [modelsRaw, propsRaw] = await Promise.all([
+      fetchJson(`${base}/v1/models`, 1500),
+      fetchJson(`${base}/props`, 1500),
+    ]);
+    const modelId = extractLiveModelId(modelsRaw);
+    const ctxPerSlot = extractCtxPerSlot(propsRaw);
+    if (modelId == null && ctxPerSlot == null) {return null;}
+    return { modelId, ctxPerSlot };
+  } catch (err) {
+    console.warn("[config-patcher] llama-server probe failed:", err);
+    return null;
+  }
+}
+
+async function fetchJson(url: string, timeoutMs: number): Promise<unknown> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => { ctrl.abort(); }, timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) {return null;}
+    return (await res.json()) as unknown;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function extractLiveModelId(raw: unknown): string | null {
+  if (!isPlainObject(raw)) {return null;}
+  // llama-server emits OpenAI-style `{data:[{id,...}]}` on /v1/models plus a
+  // nonstandard `{models:[{model|name,...}]}` mirror. Check both.
+  const data = (raw as { data?: unknown }).data;
+  if (Array.isArray(data) && data.length > 0) {
+    const first = data[0];
+    if (isPlainObject(first) && typeof first.id === "string" && first.id.length > 0) {
+      return first.id;
+    }
+  }
+  const list = (raw as { models?: unknown }).models;
+  if (Array.isArray(list) && list.length > 0) {
+    const first = list[0];
+    if (isPlainObject(first)) {
+      const model = first.model;
+      if (typeof model === "string" && model.length > 0) {return model;}
+      const name = first.name;
+      if (typeof name === "string" && name.length > 0) {return name;}
+    }
+  }
+  return null;
+}
+
+function extractCtxPerSlot(raw: unknown): number | null {
+  if (!isPlainObject(raw)) {return null;}
+  const gs = (raw as { default_generation_settings?: unknown }).default_generation_settings;
+  if (!isPlainObject(gs)) {return null;}
+  const nCtx = gs.n_ctx;
+  if (typeof nCtx !== "number" || !Number.isFinite(nCtx) || nCtx <= 0) {return null;}
+  // llama-server's /props reports n_ctx as the PER-SLOT window (total -c N
+  // divided by --parallel). Use it as-is: it's exactly what a single chat
+  // request gets.
+  return Math.floor(nCtx);
 }
 
 function extractModelIdFromProvider(provider: Record<string, unknown> | undefined): string | null {
@@ -127,4 +321,54 @@ function ensureObject(root: Record<string, unknown>, key: string): Record<string
   const obj: Record<string, unknown> = {};
   root[key] = obj;
   return obj;
+}
+
+// Sigma Eclipse extension id derived from the deterministic public `key`
+// in sigma-eclipse-extension-v2/manifest.json. Stable across rebuilds as
+// long as the manifest `key` field is unchanged.
+const SIGMA_ECLIPSE_EXTENSION_ID = "ebihdmcdigelnhlkapdcmgdjaieebidk";
+
+function collectRequiredExtensionOrigins(): string[] {
+  const ids = new Set<string>([SIGMA_ECLIPSE_EXTENSION_ID]);
+  const envIds = process.env.SIGMA_BROWSER_EXTENSION_IDS;
+  if (typeof envIds === "string" && envIds.trim().length > 0) {
+    for (const raw of envIds.split(",")) {
+      const id = raw.trim();
+      // Chrome extension ids are 32 lowercase a-p chars.
+      if (/^[a-p]{32}$/.test(id)) {
+        ids.add(id);
+      }
+    }
+  }
+  return [...ids].map((id) => `chrome-extension://${id}`);
+}
+
+function mergeOrigins(
+  existing: string[],
+  required: string[],
+): { origins: string[]; changed: boolean } {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const o of existing) {
+    const trimmed = o.trim();
+    if (!trimmed || seen.has(trimmed)) {continue;}
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  let changed = false;
+  // Always keep the "null" sentinel — it's what Node's URL.origin collapses
+  // chrome-extension:// origins to, so dropping it would break the browser
+  // extension's WebSocket handshake on the gateway side.
+  if (!seen.has("null")) {
+    seen.add("null");
+    out.push("null");
+    changed = true;
+  }
+  for (const o of required) {
+    if (seen.has(o)) {continue;}
+    seen.add(o);
+    out.push(o);
+    changed = true;
+  }
+  return { origins: out, changed };
 }

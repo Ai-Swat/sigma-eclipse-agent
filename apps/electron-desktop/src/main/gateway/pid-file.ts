@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { getPlatform } from "../platform";
 
 const PID_FILENAME = "gateway.pid";
+const LAUNCHER_PID_FILENAME = "launcher.pid";
 
 /**
  * Write the gateway child PID to a file so we can clean up orphans on next launch.
@@ -79,6 +80,90 @@ export function killOrphanedGateway(stateDir: string): number | null {
   }
 
   removeGatewayPid(stateDir);
+  return pid;
+}
+
+/**
+ * Write the launcher's own PID so the next launcher instance can detect and
+ * kill a stale predecessor (e.g. after a browser crash that left the launcher
+ * holding the discovery port / PID file / etc).
+ */
+export function writeLauncherPid(stateDir: string, pid: number): void {
+  try {
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, LAUNCHER_PID_FILENAME), String(pid), "utf-8");
+  } catch (err) {
+    console.warn("[pid-file] writeLauncherPid failed:", err);
+  }
+}
+
+/**
+ * Remove the launcher PID file (called on clean shutdown).
+ */
+export function removeLauncherPid(stateDir: string): void {
+  try {
+    fs.unlinkSync(path.join(stateDir, LAUNCHER_PID_FILENAME));
+  } catch {
+    // File may not exist — that's fine.
+  }
+}
+
+/**
+ * Read a previously written launcher PID and kill the orphaned process if it
+ * is still alive. Returns the killed PID (or null if nothing was running).
+ *
+ * This is the launcher-level analog of `killOrphanedGateway`: without it, a
+ * stale launcher from a previous crashed session keeps the discovery port
+ * (127.0.0.1:19999) bound and the new launcher fails with EADDRINUSE.
+ */
+export function killOrphanedLauncher(stateDir: string): number | null {
+  const pidPath = path.join(stateDir, LAUNCHER_PID_FILENAME);
+  let raw: string;
+  try {
+    raw = fs.readFileSync(pidPath, "utf-8").trim();
+  } catch {
+    return null;
+  }
+  const pid = Number(raw);
+  if (!Number.isFinite(pid) || pid <= 0) {
+    removeLauncherPid(stateDir);
+    return null;
+  }
+
+  if (pid === process.pid) {
+    // Shouldn't happen (new launcher reusing an old PID), but be safe.
+    removeLauncherPid(stateDir);
+    return null;
+  }
+
+  const platform = getPlatform();
+
+  if (!platform.isProcessAlive(pid)) {
+    removeLauncherPid(stateDir);
+    return null;
+  }
+
+  console.warn(`[pid-file] Killing orphaned launcher process tree (PID ${pid})`);
+  try {
+    platform.killProcessTree(pid);
+  } catch (err) {
+    console.warn("[pid-file] killProcessTree (launcher) failed:", err);
+  }
+
+  try {
+    const deadline = Date.now() + 1500;
+    while (Date.now() < deadline) {
+      if (!platform.isProcessAlive(pid)) {
+        removeLauncherPid(stateDir);
+        return pid;
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    }
+  } catch (err) {
+    console.warn("[pid-file] kill confirmation (launcher) failed:", err);
+  }
+
+  removeLauncherPid(stateDir);
   return pid;
 }
 

@@ -88,6 +88,33 @@ describe("checkBrowserOrigin", () => {
       },
       expected: { ok: false as const, reason: "origin not allowed" },
     },
+    {
+      name: "accepts chrome-extension://<id> when listed verbatim in allowedOrigins",
+      input: {
+        requestHost: "127.0.0.1:18789",
+        origin: "chrome-extension://ebihdmcdigelnhlkapdcmgdjaieebidk",
+        allowedOrigins: ["chrome-extension://ebihdmcdigelnhlkapdcmgdjaieebidk"],
+      },
+      expected: { ok: true as const, matchedBy: "allowlist" as const },
+    },
+    {
+      name: "case-insensitively accepts chrome-extension://<id> entries",
+      input: {
+        requestHost: "127.0.0.1:18789",
+        origin: "chrome-extension://EBIHDMCDIGELNHLKAPDCMGDJAIEEBIDK",
+        allowedOrigins: ["chrome-extension://ebihdmcdigelnhlkapdcmgdjaieebidk"],
+      },
+      expected: { ok: true as const, matchedBy: "allowlist" as const },
+    },
+    {
+      name: "still rejects chrome-extension origins not in the allowlist",
+      input: {
+        requestHost: "127.0.0.1:18789",
+        origin: "chrome-extension://ebihdmcdigelnhlkapdcmgdjaieebidk",
+        allowedOrigins: ["chrome-extension://someotherextensionidaaaaaaaaaaa"],
+      },
+      expected: { ok: false as const, reason: "origin not allowed" },
+    },
   ])("$name", ({ input, expected }) => {
     expect(checkBrowserOrigin(input)).toEqual(expected);
   });
