@@ -19,6 +19,32 @@
     "defaults": {
       "model": {
         "primary": "sigma-local/local-model"
+      },
+      "tools": {
+        "profile": "minimal",
+        "alsoAllow": ["browser", "memory_get", "memory_search", "session_status"],
+        "deny": [
+          "web_fetch",
+          "web_search",
+          "exec",
+          "process",
+          "read",
+          "write",
+          "edit",
+          "apply_patch",
+          "cron",
+          "image",
+          "tts",
+          "canvas",
+          "message",
+          "sessions_send",
+          "sessions_spawn",
+          "sessions_yield",
+          "subagents",
+          "agents_list",
+          "nodes",
+          "gateway"
+        ]
       }
     }
   },

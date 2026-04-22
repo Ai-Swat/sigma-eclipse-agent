@@ -19,7 +19,52 @@ import JSON5 from "json5";
  *      `chrome-relay` profile) while the agent routes through the stale
  *      `user` profile — they don't meet, and `browser` tool calls fail with
  *      `CDP /json/version missing webSocketDebuggerUrl; fallback: HTTP 404`.
+ *   4. Enforce the browser-focused tool policy on the ROOT-level `tools`
+ *      key. Sigma is shipped as an agentic browser (open tabs, click, type),
+ *      so the agent's effective toolset is locked down to the `browser` tool
+ *      plus a few read-only helpers (memory + session status). Everything
+ *      else (`web_fetch`, `web_search`, `exec`, fs writes, messaging,
+ *      sub-agents, …) is hard-denied so the LLM can't drift into
+ *      shell/file/cloud territory. Opt-out via SIGMA_DISABLE_BROWSER_FOCUS=1
+ *      for power users who want the full tool catalog.
+ *
+ *      NOTE on placement: the OpenClaw Zod schema (`zod-schema.ts`) declares
+ *      the global tool-policy under the root `tools` key. `agents.defaults`
+ *      is `.strict()` and does NOT accept a `tools` field. An earlier version
+ *      of this patcher mistakenly wrote `agents.defaults.tools`, which made
+ *      the gateway crash on startup with `Unrecognized key: "tools"`. This
+ *      patcher therefore (a) writes the policy under `cfg.tools` and (b)
+ *      deletes any stale `agents.defaults.tools` left over from that bug.
  */
+const SIGMA_BROWSER_FOCUS_ALLOW = [
+  "browser",
+  "memory_get",
+  "memory_search",
+  "session_status",
+] as const;
+
+const SIGMA_BROWSER_FOCUS_DENY = [
+  "web_fetch",
+  "web_search",
+  "exec",
+  "process",
+  "read",
+  "write",
+  "edit",
+  "apply_patch",
+  "cron",
+  "image",
+  "tts",
+  "canvas",
+  "message",
+  "sessions_send",
+  "sessions_spawn",
+  "sessions_yield",
+  "subagents",
+  "agents_list",
+  "nodes",
+  "gateway",
+] as const;
 export async function patchSigmaLocalProvider(params: {
   configPath: string;
   llamaPort: number;
@@ -118,6 +163,55 @@ export async function patchSigmaLocalProvider(params: {
     const expectedCdpUrl = `http://127.0.0.1:${expectedRelayPort}`;
     if (user && user.driver === "extension" && user.cdpUrl !== expectedCdpUrl) {
       user.cdpUrl = expectedCdpUrl;
+      changed = true;
+    }
+  }
+
+  // Migrate away from the misplaced `agents.defaults.tools` key that an
+  // earlier version of this patcher used to write. The OpenClaw schema
+  // rejects it (`agents.defaults` is `.strict()`) and the gateway refuses
+  // to start with `Unrecognized key: "tools"`. We always strip it, even
+  // when SIGMA_DISABLE_BROWSER_FOCUS=1, because leaving it in place would
+  // keep the gateway broken regardless of opt-out intent.
+  {
+    const agentsRoot = asPlainObject(cfg.agents);
+    const defaultsRoot = agentsRoot ? asPlainObject(agentsRoot.defaults) : undefined;
+    if (defaultsRoot && Object.prototype.hasOwnProperty.call(defaultsRoot, "tools")) {
+      delete defaultsRoot.tools;
+      changed = true;
+    }
+  }
+
+  // Browser-focused tool policy on the ROOT `tools` key (the only place the
+  // OpenClaw schema accepts a global tool policy — see zod-schema.ts). Forces
+  // the agent to use the `browser` tool (plus read-only helpers) and
+  // explicitly denies `web_fetch` / `web_search` / fs / exec / messaging
+  // tools so the local LLM can't drift away from the intended use case
+  // (driving the user's own browser tabs).
+  //
+  // We rewrite (not merge) the allow/deny lists every launch so that an old
+  // ~/.openclaw/openclaw.json from a previous Sigma version automatically
+  // gets the new policy. Set SIGMA_DISABLE_BROWSER_FOCUS=1 to opt out
+  // entirely (e.g. when running OpenClaw outside the Sigma browser).
+  if (process.env.SIGMA_DISABLE_BROWSER_FOCUS !== "1") {
+    const tools = ensureObject(cfg, "tools");
+    if (tools.profile !== "minimal") {
+      tools.profile = "minimal";
+      changed = true;
+    }
+    if (!arraysEqual(tools.alsoAllow, SIGMA_BROWSER_FOCUS_ALLOW)) {
+      tools.alsoAllow = [...SIGMA_BROWSER_FOCUS_ALLOW];
+      changed = true;
+    }
+    if (!arraysEqual(tools.deny, SIGMA_BROWSER_FOCUS_DENY)) {
+      tools.deny = [...SIGMA_BROWSER_FOCUS_DENY];
+      changed = true;
+    }
+    // `allow` would conflict with `alsoAllow` in the same scope (the schema
+    // explicitly forbids that combination — see addAllowAlsoAllowConflictIssue).
+    // Strip it so `profile: minimal` + `alsoAllow` stays in charge.
+    if (Object.prototype.hasOwnProperty.call(tools, "allow")) {
+      delete tools.allow;
       changed = true;
     }
   }
@@ -309,6 +403,14 @@ function extractModelIdFromProvider(provider: Record<string, unknown> | undefine
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function arraysEqual(a: unknown, b: readonly string[]): boolean {
+  if (!Array.isArray(a) || a.length !== b.length) {return false;}
+  for (let i = 0; i < b.length; i++) {
+    if (a[i] !== b[i]) {return false;}
+  }
+  return true;
 }
 
 function asPlainObject(value: unknown): Record<string, unknown> | undefined {
