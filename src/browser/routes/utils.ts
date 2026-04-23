@@ -1,10 +1,18 @@
 import { parseBooleanValue } from "../../utils/boolean.js";
+import { BrowserProfileNotFoundError } from "../errors.js";
 import type { BrowserRouteContext, ProfileContext } from "../server-context.js";
 import type { BrowserRequest, BrowserResponse } from "./types.js";
 
 /**
  * Extract profile name from query string or body and get profile context.
  * Query string takes precedence over body for consistency with GET routes.
+ *
+ * When the profile name is *explicitly* supplied by the caller and does not
+ * exist, we return 400 Bad Request rather than 404. This avoids confusing the
+ * caller (especially LLM agents) into treating an invalid profile selection
+ * as a transient resource-not-found condition. A 404 is reserved for the case
+ * where no profile was supplied and the configured default is missing — that
+ * is a server-side misconfiguration.
  */
 export function getProfileContext(
   req: BrowserRequest,
@@ -25,10 +33,15 @@ export function getProfileContext(
     }
   }
 
+  const explicit = profileName !== undefined;
   try {
     return ctx.forProfile(profileName);
   } catch (err) {
-    return { error: String(err), status: 404 };
+    const message = err instanceof Error ? err.message : String(err);
+    if (err instanceof BrowserProfileNotFoundError) {
+      return { error: message, status: explicit ? 400 : 404 };
+    }
+    return { error: message, status: 500 };
   }
 }
 
