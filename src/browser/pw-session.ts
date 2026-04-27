@@ -228,6 +228,34 @@ export function ensurePageState(page: Page): PageState {
 
   if (!observedPages.has(page)) {
     observedPages.add(page);
+    // Clear Playwright's default media-feature overrides for this page.
+    //
+    // `chromium.connectOverCDP` adopts an existing browser context whose
+    // `_options.colorScheme` is undefined, so Playwright falls back to its
+    // built-in defaults (`light` / `no-preference` / `none` / `no-preference`)
+    // and pushes them via `Emulation.setEmulatedMedia` on every page it sees.
+    // That forces dark sites into light theme regardless of the user's actual
+    // browser/OS preference.
+    //
+    // Passing `null` translates to `"no-override"` in Playwright, which CDP
+    // sends as an empty value — clearing the override and letting the page
+    // surface the real preference (Sigma's BrowserColorScheme / OS theme).
+    // Explicit overrides via `emulateMediaViaPlaywright` still work: they run
+    // after this reset and set a non-null value.
+    try {
+      void page
+        .emulateMedia({
+          colorScheme: null,
+          reducedMotion: null,
+          forcedColors: null,
+          contrast: null,
+        })
+        .catch(() => {
+          // Best-effort: page may close or navigate before the reset lands.
+        });
+    } catch {
+      // `page` may be a partial mock without `emulateMedia` (e.g. unit tests).
+    }
     page.on("console", (msg: ConsoleMessage) => {
       const entry: BrowserConsoleMessage = {
         type: msg.type(),
