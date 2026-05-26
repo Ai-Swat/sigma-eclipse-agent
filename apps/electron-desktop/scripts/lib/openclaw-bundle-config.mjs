@@ -156,6 +156,8 @@ export const ALWAYS_KEEP_PACKAGES = [
   "express",
   "ws",
   "openai",
+  "google-auth-library",
+  "@snazzah/davey",
 ];
 
 export const STRIP_EXTENSIONS = new Set([
@@ -233,7 +235,15 @@ export const STRIP_DIR_NAMES = new Set([
 ]);
 
 // Runtime package checks for post-bundle verification.
-export const CRITICAL_RUNTIME_PACKAGES = ["express", "jiti", "yaml", "music-metadata", "file-type"];
+export const CRITICAL_RUNTIME_PACKAGES = [
+  "express",
+  "jiti",
+  "yaml",
+  "music-metadata",
+  "file-type",
+  "google-auth-library",
+  "@snazzah/davey",
+];
 
 // Safe command probes for smoke validation.
 export const SMOKE_COMMANDS = [["--help"], ["channels", "--help"]];
