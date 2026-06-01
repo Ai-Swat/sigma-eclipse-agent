@@ -174,6 +174,26 @@ function quoteCmdArg(arg: string): string {
   return `"${arg.replace(/"/g, '\\"')}"`;
 }
 
+const HERMES_PROXY_ENV_KEYS = [
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "ALL_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "no_proxy",
+  "all_proxy",
+] as const;
+
+/** Drop inherited proxy env vars before spawning the Hermes Python child. */
+function envWithoutProxies(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of HERMES_PROXY_ENV_KEYS) {
+    delete env[key];
+  }
+  return env;
+}
+
 export function spawnHermesChild(params: {
   paths: HermesPackPaths;
   /** Ports / model id consumed by the bundled sigma_hermes_shim server. */
@@ -195,7 +215,7 @@ export function spawnHermesChild(params: {
   const logFd = fs.openSync(logFile, "a");
 
   const env: Record<string, string> = {
-    ...process.env,
+    ...envWithoutProxies(),
     ...extraEnv,
     // Pin the Python module search path to the bundled site-packages so a
     // user's global Python install can never shadow our code.
