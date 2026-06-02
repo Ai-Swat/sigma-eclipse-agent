@@ -198,6 +198,40 @@ describe("browser server-context ensureTabAvailable", () => {
     }
   });
 
+  it("retries briefly and resolves when /json/list is transiently empty after navigation", async () => {
+    vi.useFakeTimers();
+    try {
+      const tab = {
+        id: "424242",
+        type: "page",
+        url: "https://wiki.example/Denver",
+        webSocketDebuggerUrl: "ws://x/wiki",
+      };
+      const responses = [
+        // line 63 (tabs1): list is non-empty, so the "no attached tabs" path is skipped.
+        [tab],
+        // line 87 (tabs): transient empty list -> resolution fails this pass.
+        [],
+        // retry poll 1: still empty.
+        [],
+        // retry poll 2: the tab re-appears and resolution succeeds.
+        [tab],
+      ];
+      stubChromeJsonList(responses);
+      const state = makeBrowserState();
+
+      const ctx = createBrowserRouteContext({ getState: () => state });
+      const chrome = ctx.forProfile("chrome-relay");
+
+      const promise = chrome.ensureTabAvailable();
+      await vi.advanceTimersByTimeAsync(400);
+      const resolved = await promise;
+      expect(resolved.targetId).toBe("424242");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("returns a descriptive message when no extension tabs are attached", async () => {
     const responses = [[]];
     stubChromeJsonList(responses);
