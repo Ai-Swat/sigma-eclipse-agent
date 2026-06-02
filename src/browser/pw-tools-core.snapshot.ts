@@ -124,6 +124,7 @@ export async function snapshotAiViaPlaywright(opts: {
       track: "response",
     });
     let snapshot = String(result?.full ?? "");
+    const fullLength = snapshot.length;
     const maxChars = opts.maxChars;
     const limit =
       typeof maxChars === "number" && Number.isFinite(maxChars) && maxChars > 0
@@ -133,6 +134,21 @@ export async function snapshotAiViaPlaywright(opts: {
     if (limit && snapshot.length > limit) {
       snapshot = `${snapshot.slice(0, limit)}\n\n[...TRUNCATED - page too large]`;
       truncated = true;
+    }
+
+    // Diagnostics: when a large page's AI snapshot is truncated, the model often
+    // only sees the navigation/TOC/headings at the top of the accessibility tree
+    // and never reaches the prose. Log the raw size vs limit so we can tell a
+    // genuine truncation from an efficient-mode/empty-page or model-narration
+    // case from the gateway logs.
+    if (truncated) {
+      console.warn(
+        `[pw-session] ai-snapshot truncated target=${
+          opts.targetId ?? "(default)"
+        } fullChars=${fullLength} limit=${limit} keptPct=${Math.round(
+          ((limit ?? 0) / fullLength) * 100,
+        )}`,
+      );
     }
 
     const built = buildRoleSnapshotFromAiSnapshot(snapshot);
