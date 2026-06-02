@@ -137,6 +137,64 @@ describe("pw-session getPageForTargetId", () => {
     }
   });
 
+  it("positionally aligns relay pages with /json/list when Playwright cannot expose page URLs", async () => {
+    // Reproduces the field scenario: over the extension relay Playwright reports
+    // page.url() === "" for every page, so URL-based matching is impossible even
+    // though the target exists in /json/list. We must still resolve by position.
+    const pageOn = vi.fn();
+    const contextOn = vi.fn();
+    const browserOn = vi.fn();
+    const newCDPSession = vi.fn(async () => {
+      throw new Error("Target.attachToBrowserTarget: Not allowed");
+    });
+    const context = {
+      pages: () => [],
+      on: contextOn,
+      newCDPSession,
+    } as unknown as import("playwright-core").BrowserContext;
+    const pages = ["", ""].map(
+      (url) =>
+        ({
+          on: pageOn,
+          context: () => context,
+          url: () => url,
+        }) as unknown as import("playwright-core").Page,
+    );
+    (context as unknown as { pages: () => unknown[] }).pages = () => pages;
+    const browser = {
+      contexts: () => [context],
+      on: browserOn,
+      close: vi.fn(async () => {}),
+    } as unknown as import("playwright-core").Browser;
+    connectOverCdpSpy.mockResolvedValue(browser);
+    getChromeWebSocketUrlSpy.mockResolvedValue(null);
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ Browser: "OpenClaw/extension-relay" }),
+      } as Response)
+      .mockResolvedValue({
+        ok: true,
+        json: async () => [
+          { id: "1588776567", url: "sigma://home-page/" },
+          { id: "1588776569", url: "about:blank" },
+        ],
+      } as Response);
+
+    try {
+      const resolved = await getPageForTargetId({
+        cdpUrl: "http://127.0.0.1:20222",
+        targetId: "1588776569",
+      });
+      expect(resolved).toBe(pages[1]);
+      expect(newCDPSession).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it("resolves extension-relay pages from /json/list without probing page CDP sessions first", async () => {
     const { newCDPSession, pages } = createExtensionFallbackBrowserHarness({
       urls: ["https://alpha.example", "https://beta.example"],
