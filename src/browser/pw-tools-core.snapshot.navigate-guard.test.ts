@@ -77,6 +77,81 @@ describe("pw-tools-core.snapshot navigate guard", () => {
     expect(result.url).toBe("https://example.com/recovered");
   });
 
+  it("retries multiple times across a sustained detached-frame window", async () => {
+    const prevDelay = process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_DELAY_MS;
+    process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_DELAY_MS = "0";
+    try {
+      const goto = vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockRejectedValueOnce(new Error("page.goto: Frame has been detached"))
+        .mockRejectedValueOnce(new Error("page.goto: Frame has been detached"))
+        .mockRejectedValueOnce(new Error("page.goto: Frame has been detached"))
+        .mockResolvedValueOnce(undefined);
+      setPwToolsCoreCurrentPage({
+        goto,
+        url: vi.fn(() => "https://example.com/eventually"),
+      });
+
+      const result = await mod.navigateViaPlaywright({
+        cdpUrl: "http://127.0.0.1:18792",
+        targetId: "tab-9",
+        url: "https://example.com/eventually",
+        ssrfPolicy: { allowPrivateNetwork: true },
+      });
+
+      // default budget is 4 attempts: 3 failures + 1 success
+      expect(goto).toHaveBeenCalledTimes(4);
+      expect(getPwToolsCoreSessionMocks().forceDisconnectPlaywrightForTarget).toHaveBeenCalledTimes(
+        3,
+      );
+      expect(result.url).toBe("https://example.com/eventually");
+    } finally {
+      if (prevDelay === undefined) {
+        delete process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_DELAY_MS;
+      } else {
+        process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_DELAY_MS = prevDelay;
+      }
+    }
+  });
+
+  it("gives up after exhausting the retry budget on a persistent detached frame", async () => {
+    const prevDelay = process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_DELAY_MS;
+    const prevAttempts = process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_ATTEMPTS;
+    process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_DELAY_MS = "0";
+    process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_ATTEMPTS = "3";
+    try {
+      const goto = vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockRejectedValue(new Error("page.goto: Frame has been detached"));
+      setPwToolsCoreCurrentPage({
+        goto,
+        url: vi.fn(() => "about:blank"),
+      });
+
+      await expect(
+        mod.navigateViaPlaywright({
+          cdpUrl: "http://127.0.0.1:18792",
+          targetId: "tab-stuck",
+          url: "https://example.com/stuck",
+          ssrfPolicy: { allowPrivateNetwork: true },
+        }),
+      ).rejects.toThrow(/detached/i);
+
+      expect(goto).toHaveBeenCalledTimes(3);
+    } finally {
+      if (prevDelay === undefined) {
+        delete process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_DELAY_MS;
+      } else {
+        process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_DELAY_MS = prevDelay;
+      }
+      if (prevAttempts === undefined) {
+        delete process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_ATTEMPTS;
+      } else {
+        process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_ATTEMPTS = prevAttempts;
+      }
+    }
+  });
+
   it("blocks private intermediate redirect hops during navigation", async () => {
     const goto = vi.fn(async () => ({
       request: () => ({
