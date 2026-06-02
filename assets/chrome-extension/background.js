@@ -25,7 +25,7 @@ let relayConnectRequestId = null
 
 let nextSession = 1
 
-/** @type {Map<number, {state:'connecting'|'connected', sessionId?:string, targetId?:string, attachOrder?:number}>} */
+/** @type {Map<number, {state:'connecting'|'connected', sessionId?:string, targetId?:string, cdpTargetId?:string, attachOrder?:number}>} */
 const tabs = new Map()
 /** @type {Map<string, number>} */
 const tabBySession = new Map()
@@ -89,6 +89,36 @@ async function validateAttachedTab(tabId) {
   return false
 }
 
+function stableTargetIdForTab(tabId) {
+  return String(tabId)
+}
+
+function stableTargetInfoForTab(tabId, targetInfo) {
+  return {
+    ...(targetInfo || {}),
+    targetId: stableTargetIdForTab(tabId),
+    attached: true,
+  }
+}
+
+function relayParamsForDebuggerEvent(tabId, method, params) {
+  if (method === 'Target.targetInfoChanged' && params?.targetInfo) {
+    return {
+      ...params,
+      targetInfo: stableTargetInfoForTab(tabId, params.targetInfo),
+    }
+  }
+  if (
+    (method === 'Target.targetCreated' ||
+      method === 'Target.targetDestroyed' ||
+      method === 'Target.targetCrashed') &&
+    params?.targetId
+  ) {
+    return { ...params, targetId: stableTargetIdForTab(tabId) }
+  }
+  return params
+}
+
 async function getRelayPort() {
   const stored = await chrome.storage.local.get(['relayPort'])
   const raw = stored.relayPort
@@ -139,10 +169,12 @@ async function rehydrateState() {
     const entries = stored.persistedTabs || []
     // Phase 1: optimistically restore state and badges.
     for (const entry of entries) {
+      const stableTargetId = stableTargetIdForTab(entry.tabId)
       tabs.set(entry.tabId, {
         state: 'connected',
         sessionId: entry.sessionId,
-        targetId: entry.targetId,
+        targetId: stableTargetId,
+        cdpTargetId: entry.targetId === stableTargetId ? undefined : entry.targetId,
         attachOrder: entry.attachOrder,
       })
       tabBySession.set(entry.sessionId, entry.tabId)
@@ -328,13 +360,14 @@ async function reannounceAttachedTabs() {
     }
 
     try {
+      const stableTargetInfo = stableTargetInfoForTab(tabId, targetInfo)
       sendToRelay({
         method: 'forwardCDPEvent',
         params: {
           method: 'Target.attachedToTarget',
           params: {
             sessionId: tab.sessionId,
-            targetInfo: { ...targetInfo, attached: true },
+            targetInfo: stableTargetInfo,
             waitingForDebugger: false,
           },
         },
@@ -501,8 +534,13 @@ function getTabBySessionId(sessionId) {
 }
 
 function getTabByTargetId(targetId) {
+  const directTabId = Number.parseInt(targetId, 10)
+  if (Number.isFinite(directTabId) && stableTargetIdForTab(directTabId) === targetId) {
+    const tab = tabs.get(directTabId)
+    if (tab?.state === 'connected') return directTabId
+  }
   for (const [tabId, tab] of tabs.entries()) {
-    if (tab.targetId === targetId) return tabId
+    if (tab.targetId === targetId || tab.cdpTargetId === targetId) return tabId
   }
   return null
 }
@@ -514,16 +552,18 @@ async function attachTab(tabId, opts = {}) {
 
   const info = /** @type {any} */ (await chrome.debugger.sendCommand(debuggee, 'Target.getTargetInfo'))
   const targetInfo = info?.targetInfo
-  const targetId = String(targetInfo?.targetId || '').trim()
-  if (!targetId) {
+  const cdpTargetId = String(targetInfo?.targetId || '').trim()
+  if (!cdpTargetId) {
     throw new Error('Target.getTargetInfo returned no targetId')
   }
+  const targetId = stableTargetIdForTab(tabId)
+  const stableTargetInfo = stableTargetInfoForTab(tabId, targetInfo)
 
   const sid = nextSession++
   const sessionId = `cb-tab-${sid}`
   const attachOrder = sid
 
-  tabs.set(tabId, { state: 'connected', sessionId, targetId, attachOrder })
+  tabs.set(tabId, { state: 'connected', sessionId, targetId, cdpTargetId, attachOrder })
   tabBySession.set(sessionId, tabId)
   void chrome.action.setTitle({
     tabId,
@@ -537,7 +577,7 @@ async function attachTab(tabId, opts = {}) {
         method: 'Target.attachedToTarget',
         params: {
           sessionId,
-          targetInfo: { ...targetInfo, attached: true },
+          targetInfo: stableTargetInfo,
           waitingForDebugger: false,
         },
       },
@@ -760,7 +800,7 @@ function onDebuggerEvent(source, method, params) {
       params: {
         sessionId: source.sessionId || tab.sessionId,
         method,
-        params,
+        params: relayParamsForDebuggerEvent(tabId, method, params),
       },
     })
   } catch {
