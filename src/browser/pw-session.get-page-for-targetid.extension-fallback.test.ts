@@ -94,6 +94,49 @@ describe("pw-session getPageForTargetId", () => {
     }
   });
 
+  it("retries page resolution while the relay's /json/list transiently lacks the target", async () => {
+    vi.useFakeTimers();
+    const { pages } = createExtensionFallbackBrowserHarness({
+      urls: ["https://alpha.example", "https://beta.example"],
+      newCDPSessionError: "Target.attachToBrowserTarget: Not allowed",
+    });
+    const [, pageB] = pages;
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy
+      // relay-endpoint probe (isExtensionRelayCdpEndpoint), cached afterwards
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ Browser: "OpenClaw/extension-relay" }),
+      } as Response)
+      // first /json/list pass: target re-creating during navigation, not listed yet
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: "TARGET_A", url: "https://alpha.example" }],
+      } as Response)
+      // subsequent passes: target has re-appeared
+      .mockResolvedValue({
+        ok: true,
+        json: async () => [
+          { id: "TARGET_A", url: "https://alpha.example" },
+          { id: "TARGET_B", url: "https://beta.example" },
+        ],
+      } as Response);
+
+    try {
+      const promise = getPageForTargetId({
+        cdpUrl: "http://127.0.0.1:20111",
+        targetId: "TARGET_B",
+      });
+      await vi.advanceTimersByTimeAsync(600);
+      const resolved = await promise;
+      expect(resolved).toBe(pageB);
+    } finally {
+      fetchSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it("resolves extension-relay pages from /json/list without probing page CDP sessions first", async () => {
     const { newCDPSession, pages } = createExtensionFallbackBrowserHarness({
       urls: ["https://alpha.example", "https://beta.example"],

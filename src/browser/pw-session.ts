@@ -482,25 +482,64 @@ async function findPageByTargetIdViaTargetList(
   return matchPageByTargetList(pages, targets, targetId);
 }
 
-async function findPageByTargetId(
+// Bounded retry budget for resolving a Playwright Page from a targetId. During
+// a top-level navigation the extension relay tears down and re-creates the CDP
+// target, so for a short window neither `browser.pages()` nor the relay's
+// `/json/list` reflects the requested id yet — and a hard throw here surfaces as
+// the user-visible "tab not found". Waiting out that window turns the race into
+// a transparent recovery. Tunable via env for field debugging.
+const PAGE_RESOLUTION_RETRY_MS =
+  Number(process.env.OPENCLAW_BROWSER_PAGE_RESOLUTION_RETRY_MS) || 3_000;
+const PAGE_RESOLUTION_RETRY_POLL_MS = 150;
+
+function summarizePwPagesForLog(pages: Page[]): string {
+  try {
+    return JSON.stringify(pages.map((p) => (p.url() || "").slice(0, 80)));
+  } catch {
+    return `<${pages.length} pages>`;
+  }
+}
+
+async function summarizeCdpTargetsForLog(cdpUrl: string): Promise<string> {
+  try {
+    const cdpHttpBase = normalizeCdpHttpBaseForJsonEndpoints(cdpUrl);
+    const targets = await fetchJson<Array<{ id: string; url: string; type?: string }>>(
+      appendCdpPath(cdpHttpBase, "/json/list"),
+      2000,
+    );
+    return JSON.stringify(
+      targets.map((t) => ({
+        id: t.id,
+        type: t.type ?? "page",
+        url: (t.url ?? "").slice(0, 80),
+      })),
+    );
+  } catch (err) {
+    return `<error: ${formatErrorMessage(err)}>`;
+  }
+}
+
+// Single resolution pass. Mirrors the original matching logic exactly; the
+// retry/diagnostics layer lives in findPageByTargetId. `pageCount` is returned
+// so the caller can decide whether a miss is transient (worth retrying) or
+// definitive (a stable single-page non-relay session).
+async function attemptFindPageByTargetId(
   browser: Browser,
   targetId: string,
-  cdpUrl?: string,
-): Promise<Page | null> {
+  cdpUrl: string | undefined,
+  isExtensionRelay: boolean,
+): Promise<{ page: Page | null; pageCount: number }> {
   const pages = await getAllPages(browser);
-  const isExtensionRelay = cdpUrl
-    ? await isExtensionRelayCdpEndpoint(cdpUrl).catch(() => false)
-    : false;
   if (cdpUrl && isExtensionRelay) {
     try {
       const matched = await findPageByTargetIdViaTargetList(pages, targetId, cdpUrl);
       if (matched) {
-        return matched;
+        return { page: matched, pageCount: pages.length };
       }
     } catch {
       // Ignore fetch errors and fall through to best-effort single-page fallback.
     }
-    return pages.length === 1 ? (pages[0] ?? null) : null;
+    return { page: pages.length === 1 ? (pages[0] ?? null) : null, pageCount: pages.length };
   }
 
   let resolvedViaCdp = false;
@@ -513,20 +552,67 @@ async function findPageByTargetId(
       tid = null;
     }
     if (tid && tid === targetId) {
-      return page;
+      return { page, pageCount: pages.length };
     }
   }
   if (cdpUrl) {
     try {
-      return await findPageByTargetIdViaTargetList(pages, targetId, cdpUrl);
+      const matched = await findPageByTargetIdViaTargetList(pages, targetId, cdpUrl);
+      return { page: matched, pageCount: pages.length };
     } catch {
       // Ignore fetch errors and fall through to return null.
     }
   }
   if (!resolvedViaCdp && pages.length === 1) {
-    return pages[0] ?? null;
+    return { page: pages[0] ?? null, pageCount: pages.length };
   }
-  return null;
+  return { page: null, pageCount: pages.length };
+}
+
+async function findPageByTargetId(
+  browser: Browser,
+  targetId: string,
+  cdpUrl?: string,
+): Promise<Page | null> {
+  const isExtensionRelay = cdpUrl
+    ? await isExtensionRelayCdpEndpoint(cdpUrl).catch(() => false)
+    : false;
+
+  const startedAt = Date.now();
+  const deadline = startedAt + PAGE_RESOLUTION_RETRY_MS;
+  let attempts = 0;
+  for (;;) {
+    attempts += 1;
+    const attempt = await attemptFindPageByTargetId(browser, targetId, cdpUrl, isExtensionRelay);
+    if (attempt.page) {
+      if (attempts > 1) {
+        console.warn(
+          `[pw-session] page resolved after ${Date.now() - startedAt}ms / ${attempts} attempts ` +
+            `target=${targetId} extRelay=${isExtensionRelay}`,
+        );
+      }
+      return attempt.page;
+    }
+
+    // A miss is only worth waiting out when it can plausibly be a transient
+    // cross-process navigation race: the extension relay re-creates the CDP
+    // target on top-level navigation, and any multi-page session can briefly
+    // expose a stale/incomplete /json/list. A stable single-page non-relay
+    // session is definitive, so return immediately and preserve the existing
+    // fast single-page fallback semantics in getPageForTargetId.
+    const retryEligible = Boolean(cdpUrl) && (isExtensionRelay || attempt.pageCount > 1);
+    if (!retryEligible || Date.now() >= deadline) {
+      const pages = await getAllPages(browser).catch(() => [] as Page[]);
+      const cdpTargets = cdpUrl ? await summarizeCdpTargetsForLog(cdpUrl) : "(no cdpUrl)";
+      console.warn(
+        `[pw-session] page-not-found target=${targetId} extRelay=${isExtensionRelay} ` +
+          `pwPages=${pages.length} attempts=${attempts} elapsed=${Date.now() - startedAt}ms ` +
+          `pwUrls=${summarizePwPagesForLog(pages)} cdpTargets=${cdpTargets}`,
+      );
+      return null;
+    }
+    await new Promise((resolve) => setTimeout(resolve, PAGE_RESOLUTION_RETRY_POLL_MS));
+  }
 }
 
 async function resolvePageByTargetIdOrThrow(opts: {
