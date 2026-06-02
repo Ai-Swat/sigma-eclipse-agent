@@ -280,26 +280,51 @@ export async function navigateViaPlaywright(opts: {
     ...withBrowserNavigationPolicy(opts.ssrfPolicy),
   });
   const timeout = Math.max(1000, Math.min(120_000, opts.timeoutMs ?? 20_000));
+  // Cross-process navigation over the extension relay detaches the frame while
+  // the renderer swaps. A single immediate retry isn't enough: field logs show
+  // both the initial goto AND a ~170ms-later retry hit "Frame has been detached"
+  // back-to-back, while the next tool call ~4s later succeeded. So retry a few
+  // times with a short backoff (and a forced reconnect each time) to ride out
+  // the swap window. Tunable via env for field debugging.
+  const maxNavigateAttempts = Math.max(
+    1,
+    Number(process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_ATTEMPTS) || 4,
+  );
+  const navigateRetryDelayMs = Math.max(
+    0,
+    Number(process.env.OPENCLAW_BROWSER_NAVIGATE_RETRY_DELAY_MS) || 400,
+  );
   let page = await getPageForTargetId(opts);
   ensurePageState(page);
   const navigate = async () => await page.goto(url, { timeout });
   let response;
-  try {
-    response = await navigate();
-  } catch (err) {
-    if (!isRetryableNavigateError(err)) {
-      throw err;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      response = await navigate();
+      break;
+    } catch (err) {
+      if (!isRetryableNavigateError(err) || attempt >= maxNavigateAttempts) {
+        throw err;
+      }
+      console.warn(
+        `[pw-session] navigate detached-frame retry ${attempt}/${
+          maxNavigateAttempts - 1
+        } target=${opts.targetId ?? "(default)"} url=${url.slice(0, 80)}`,
+      );
+      // Extension relays can briefly drop CDP during renderer swaps/navigation.
+      // Force a clean reconnect, wait out the swap window, then retry on the
+      // refreshed page handle.
+      await forceDisconnectPlaywrightForTarget({
+        cdpUrl: opts.cdpUrl,
+        targetId: opts.targetId,
+        reason: "retry navigate after detached frame",
+      }).catch(() => {});
+      if (navigateRetryDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, navigateRetryDelayMs));
+      }
+      page = await getPageForTargetId(opts);
+      ensurePageState(page);
     }
-    // Extension relays can briefly drop CDP during renderer swaps/navigation.
-    // Force a clean reconnect, then retry once on the refreshed page handle.
-    await forceDisconnectPlaywrightForTarget({
-      cdpUrl: opts.cdpUrl,
-      targetId: opts.targetId,
-      reason: "retry navigate after detached frame",
-    }).catch(() => {});
-    page = await getPageForTargetId(opts);
-    ensurePageState(page);
-    response = await navigate();
   }
   await assertBrowserNavigationRedirectChainAllowed({
     request: response?.request(),
