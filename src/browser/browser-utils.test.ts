@@ -42,6 +42,13 @@ describe("browser target id resolution", () => {
     expect(res).toEqual({ ok: true, targetId: "FULL" });
   });
 
+  it("resolves CDP target id aliases to canonical tab ids", () => {
+    const res = resolveTargetIdFromTabs("57A01309E14B5DEE0FB41F908515A2FC", [
+      { targetId: "12", cdpTargetId: "57A01309E14B5DEE0FB41F908515A2FC" },
+    ]);
+    expect(res).toEqual({ ok: true, targetId: "12" });
+  });
+
   it("resolves unique prefixes (case-insensitive)", () => {
     const res = resolveTargetIdFromTabs("57a01309", [
       { targetId: "57A01309E14B5DEE0FB41F908515A2FC" },
@@ -50,6 +57,13 @@ describe("browser target id resolution", () => {
       ok: true,
       targetId: "57A01309E14B5DEE0FB41F908515A2FC",
     });
+  });
+
+  it("resolves unique CDP alias prefixes to canonical tab ids", () => {
+    const res = resolveTargetIdFromTabs("57a01309", [
+      { targetId: "12", cdpTargetId: "57A01309E14B5DEE0FB41F908515A2FC" },
+    ]);
+    expect(res).toEqual({ ok: true, targetId: "12" });
   });
 
   it("fails on ambiguous prefixes", () => {

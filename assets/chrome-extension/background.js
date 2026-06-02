@@ -94,9 +94,12 @@ function stableTargetIdForTab(tabId) {
 }
 
 function stableTargetInfoForTab(tabId, targetInfo) {
+  const cdpTargetId = String(targetInfo?.targetId || '').trim()
+  const targetId = stableTargetIdForTab(tabId)
   return {
     ...(targetInfo || {}),
-    targetId: stableTargetIdForTab(tabId),
+    targetId,
+    ...(cdpTargetId && cdpTargetId !== targetId ? { cdpTargetId } : {}),
     attached: true,
   }
 }
@@ -146,7 +149,13 @@ async function persistState() {
     const tabEntries = []
     for (const [tabId, tab] of tabs.entries()) {
       if (tab.state === 'connected' && tab.sessionId && tab.targetId) {
-        tabEntries.push({ tabId, sessionId: tab.sessionId, targetId: tab.targetId, attachOrder: tab.attachOrder })
+        tabEntries.push({
+          tabId,
+          sessionId: tab.sessionId,
+          targetId: tab.targetId,
+          cdpTargetId: tab.cdpTargetId,
+          attachOrder: tab.attachOrder,
+        })
       }
     }
     await chrome.storage.session.set({
@@ -174,7 +183,7 @@ async function rehydrateState() {
         state: 'connected',
         sessionId: entry.sessionId,
         targetId: stableTargetId,
-        cdpTargetId: entry.targetId === stableTargetId ? undefined : entry.targetId,
+        cdpTargetId: entry.cdpTargetId || (entry.targetId === stableTargetId ? undefined : entry.targetId),
         attachOrder: entry.attachOrder,
       })
       tabBySession.set(entry.sessionId, entry.tabId)

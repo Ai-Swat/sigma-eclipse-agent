@@ -197,6 +197,7 @@ export function createProfileTabOps({
     const raw = await fetchJson<
       Array<{
         id?: string;
+        cdpTargetId?: string;
         title?: string;
         url?: string;
         webSocketDebuggerUrl?: string;
@@ -206,6 +207,7 @@ export function createProfileTabOps({
     return raw
       .map((t) => ({
         targetId: t.id ?? "",
+        cdpTargetId: t.cdpTargetId,
         title: t.title ?? "",
         url: t.url ?? "",
         wsUrl: normalizeWsUrl(t.webSocketDebuggerUrl, profile.cdpUrl),
