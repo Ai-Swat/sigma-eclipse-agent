@@ -12,6 +12,7 @@ export {
   focusPageByTargetIdViaPlaywright,
   getPageForTargetId,
   listPagesViaPlaywright,
+  navigateTargetViaCdpOverRelay,
   refLocator,
   type WithSnapshotForAI,
 } from "./pw-session.js";

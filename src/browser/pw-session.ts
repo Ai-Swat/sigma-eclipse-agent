@@ -478,9 +478,26 @@ function matchPageByTargetList(
   if (urlsUnavailable && pages.length === targets.length) {
     const idx = targets.findIndex((entry) => entry.id === targetId);
     if (idx >= 0 && idx < pages.length) {
+      // Diagnostics: positional alignment is the only signal here, but if the
+      // requested target's /json/list url is about:blank/empty while a sibling
+      // target carries a real http(s) url, the agent is anchored to a stale or
+      // wrong tab (e.g. a cross-process navigation swapped the target id and the
+      // session still references the old blank one). Surface the full target map
+      // and the chosen page url so the next run pins "wrong-tab" vs
+      // "stale-target-after-swap" definitively rather than guessing.
+      let chosenUrl = "";
+      try {
+        chosenUrl = pages[idx]?.url() || "";
+      } catch {
+        chosenUrl = "?";
+      }
+      const targetMap = targets
+        .map((entry) => `${entry.id}:${(entry.url || "(empty)").slice(0, 48)}`)
+        .join("|");
       console.warn(
         `[pw-session] positional-fallback target=${targetId} idx=${idx}/${pages.length} ` +
-          `(playwright page urls unavailable over relay)`,
+          `requestedUrl=${(target.url || "(empty)").slice(0, 48)} chosenPageUrl=${chosenUrl.slice(0, 48) || "(empty)"} ` +
+          `targets=[${targetMap}] (playwright page urls unavailable over relay)`,
       );
       return pages[idx] ?? null;
     }
@@ -915,6 +932,138 @@ export async function listPagesViaPlaywright(opts: { cdpUrl: string }): Promise<
  * Used for remote profiles where HTTP-based /json/new is ephemeral.
  * Returns the new page's targetId and metadata.
  */
+function urlHostForRelayNav(raw: string): string {
+  try {
+    return new URL(raw).host.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+async function fetchRelayTargetUrl(cdpUrl: string, targetId: string): Promise<string | null> {
+  try {
+    const base = normalizeCdpHttpBaseForJsonEndpoints(cdpUrl);
+    const targets = await fetchJson<Array<{ id: string; url: string }>>(
+      appendCdpPath(base, "/json/list"),
+      2000,
+    );
+    const entry = targets.find((t) => t.id === targetId);
+    return entry ? String(entry.url ?? "") : null;
+  } catch {
+    return null;
+  }
+}
+
+// Per-command CDP timeout for relay navigation. Kept well under the OpenClaw
+// gateway's ~15s browser-tool watchdog so that, if a method hangs, our own
+// descriptive error/diagnostics surface first instead of the generic
+// "browser failed: timed out" from the gateway side.
+const RELAY_NAV_COMMAND_TIMEOUT_MS = 6_000;
+const RELAY_NAV_MAX_TOTAL_MS = 12_000;
+
+/**
+ * Navigate a tab over the extension relay by issuing a renderer-side
+ * `location.assign(url)` through CDP `Runtime.evaluate`, then confirming the
+ * commit by polling /json/list.
+ *
+ * Why this shape:
+ *  - Playwright's `page.goto` holds a frame reference that the relay invalidates
+ *    on the cross-process commit (about:blank / sigma:// -> https), surfacing as
+ *    a deterministic "Frame has been detached" that no retry can ride out.
+ *  - `Target.createTarget {url}` (the `open` path for the relay) creates the tab
+ *    but does NOT navigate it, leaving about:blank.
+ *  - Raw CDP `Page.navigate` addressed by targetId appears NOT to be forwarded
+ *    by the relay (field logs: the call hangs until the gateway watchdog fires).
+ *  - `Runtime.evaluate` IS forwarded (the evaluate tool works over the relay),
+ *    and a renderer-initiated `location.assign` does not depend on a live
+ *    Playwright frame surviving the swap, so it actually commits.
+ *
+ * Shared by the `navigate` action and the `open` (createTarget) relay path.
+ */
+export async function navigateTargetViaCdpOverRelay(opts: {
+  cdpUrl: string;
+  targetId: string;
+  url: string;
+  timeoutMs: number;
+  page?: Page;
+}): Promise<{ url: string }> {
+  let page = opts.page;
+  if (!page) {
+    page = await getPageForTargetId({ cdpUrl: opts.cdpUrl, targetId: opts.targetId });
+    ensurePageState(page);
+  }
+
+  const startedAt = Date.now();
+  try {
+    await withPageScopedCdpClient({
+      cdpUrl: opts.cdpUrl,
+      page,
+      targetId: opts.targetId,
+      commandTimeoutMs: RELAY_NAV_COMMAND_TIMEOUT_MS,
+      fn: async (send) => {
+        await send("Runtime.enable").catch(() => {});
+        return await send("Runtime.evaluate", {
+          expression: `location.assign(${JSON.stringify(opts.url)})`,
+          awaitPromise: false,
+          userGesture: true,
+          returnByValue: true,
+        });
+      },
+    });
+    console.warn(
+      `[pw-session] navigate cdp-relay issued via=runtime.evaluate target=${opts.targetId} dt=${
+        Date.now() - startedAt
+      }ms`,
+    );
+  } catch (err) {
+    console.warn(
+      `[pw-session] navigate cdp-relay issue-failed via=runtime.evaluate target=${
+        opts.targetId
+      } err=${String(err).slice(0, 100)}`,
+    );
+    throw new Error(`navigation could not be issued over extension relay: ${String(err)}`, {
+      cause: err,
+    });
+  }
+
+  const wantHost = urlHostForRelayNav(opts.url);
+  const deadline = startedAt + Math.min(opts.timeoutMs, RELAY_NAV_MAX_TOTAL_MS);
+  let lastUrl = "";
+  while (Date.now() < deadline) {
+    const current = await fetchRelayTargetUrl(opts.cdpUrl, opts.targetId);
+    if (current != null) {
+      lastUrl = current;
+      const host = urlHostForRelayNav(current);
+      const committed =
+        current !== "" &&
+        current !== "about:blank" &&
+        (!wantHost ||
+          host === wantHost ||
+          host.endsWith(`.${wantHost}`) ||
+          wantHost.endsWith(`.${host}`));
+      if (committed) {
+        console.warn(
+          `[pw-session] navigate cdp-relay committed target=${opts.targetId} url=${current.slice(
+            0,
+            80,
+          )} dt=${Date.now() - startedAt}ms`,
+        );
+        return { url: current };
+      }
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+
+  console.warn(
+    `[pw-session] navigate cdp-relay no-commit target=${opts.targetId} want=${
+      wantHost || "(any)"
+    } lastUrl=${lastUrl.slice(0, 80) || "(empty)"} dt=${Date.now() - startedAt}ms`,
+  );
+  throw new Error(
+    `navigation did not commit over extension relay (target stayed ${lastUrl || "about:blank"})`,
+  );
+}
+
 export async function createPageViaPlaywright(opts: {
   cdpUrl: string;
   url: string;
@@ -940,6 +1089,37 @@ export async function createPageViaPlaywright(opts: {
       url: targetUrl,
       ...navigationPolicy,
     });
+
+    // Over the extension relay, `page.goto` detaches deterministically on the
+    // cross-process commit and the previous `.catch(() => null)` silently left
+    // the freshly created tab on about:blank — the agent then saw an empty
+    // page. Drive navigation via raw CDP Page.navigate (addressed by targetId)
+    // which does not depend on a live Playwright frame surviving the swap.
+    const isRelay = await isExtensionRelayCdpEndpoint(opts.cdpUrl).catch(() => false);
+    if (isRelay) {
+      const relayTid = await pageTargetId(page).catch(() => null);
+      if (!relayTid) {
+        throw new Error("Failed to get targetId for new page");
+      }
+      const navigated = await navigateTargetViaCdpOverRelay({
+        cdpUrl: opts.cdpUrl,
+        targetId: relayTid,
+        url: targetUrl,
+        timeoutMs: 30_000,
+        page,
+      });
+      await assertBrowserNavigationResultAllowed({
+        url: navigated.url,
+        ...navigationPolicy,
+      });
+      return {
+        targetId: relayTid,
+        title: await page.title().catch(() => ""),
+        url: navigated.url,
+        type: "page",
+      };
+    }
+
     const response = await page.goto(targetUrl, { timeout: 30_000 }).catch(() => {
       // Navigation might fail for some URLs, but page is still created
       return null;

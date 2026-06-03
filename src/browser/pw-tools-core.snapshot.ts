@@ -17,10 +17,11 @@ import {
   ensurePageState,
   forceDisconnectPlaywrightForTarget,
   getPageForTargetId,
+  navigateTargetViaCdpOverRelay,
   storeRoleRefsForTarget,
   type WithSnapshotForAI,
 } from "./pw-session.js";
-import { withPageScopedCdpClient } from "./pw-session.page-cdp.js";
+import { isExtensionRelayCdpEndpoint, withPageScopedCdpClient } from "./pw-session.page-cdp.js";
 import { isRetryablePlaywrightError } from "./pw-tools-core.shared.js";
 
 const SNAPSHOT_RETRY_DELAY_MS = 1500;
@@ -125,6 +126,27 @@ export async function snapshotAiViaPlaywright(opts: {
     });
     let snapshot = String(result?.full ?? "");
     const fullLength = snapshot.length;
+
+    // Diagnostics: the agent reports getting "about:blank"/empty content even
+    // when navigate succeeded. That happens when the snapshot resolves to the
+    // wrong (blank) page — e.g. positional-fallback picked a sibling tab, or a
+    // cross-process navigation swapped the target id and the session still
+    // references the old blank one. Log the resolved page url + snapshot size
+    // whenever the result looks blank so we can confirm it from gateway logs.
+    let resolvedUrl = "";
+    try {
+      resolvedUrl = page.url() || "";
+    } catch {
+      resolvedUrl = "?";
+    }
+    if (fullLength < 2000 || !resolvedUrl || resolvedUrl === "about:blank") {
+      console.warn(
+        `[pw-session] ai-snapshot suspicious target=${
+          opts.targetId ?? "(default)"
+        } resolvedUrl=${resolvedUrl.slice(0, 80) || "(empty)"} chars=${fullLength}`,
+      );
+    }
+
     const maxChars = opts.maxChars;
     const limit =
       typeof maxChars === "number" && Number.isFinite(maxChars) && maxChars > 0
@@ -296,6 +318,25 @@ export async function navigateViaPlaywright(opts: {
     ...withBrowserNavigationPolicy(opts.ssrfPolicy),
   });
   const timeout = Math.max(1000, Math.min(120_000, opts.timeoutMs ?? 20_000));
+
+  // Over the extension relay, drive navigation through raw CDP Page.navigate
+  // (addressed by targetId) instead of Playwright's page.goto. goto detaches
+  // deterministically on the cross-process commit and never lands; the CDP path
+  // does not depend on a live Playwright frame surviving the renderer swap.
+  if (opts.targetId && (await isExtensionRelayCdpEndpoint(opts.cdpUrl))) {
+    const result = await navigateTargetViaCdpOverRelay({
+      cdpUrl: opts.cdpUrl,
+      targetId: opts.targetId,
+      url,
+      timeoutMs: timeout,
+    });
+    await assertBrowserNavigationResultAllowed({
+      url: result.url,
+      ...withBrowserNavigationPolicy(opts.ssrfPolicy),
+    });
+    return result;
+  }
+
   // Cross-process navigation over the extension relay detaches the frame while
   // the renderer swaps. A single immediate retry isn't enough: field logs show
   // both the initial goto AND a ~170ms-later retry hit "Frame has been detached"
