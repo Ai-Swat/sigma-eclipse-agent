@@ -285,14 +285,6 @@ export function createProfileTabOps({
       );
     }
 
-    // Tabs observed before we start openTab cannot be the newly created one,
-    // even if their URL matches the requested URL.
-    const preExistingTargetIds = new Set(
-      await listTabs()
-        .then((tabs) => tabs.map((t) => t.targetId))
-        .catch(() => [] as string[]),
-    );
-
     let cdpCreateError: unknown = null;
     const createdViaCdp = await createTargetViaCdp({
       cdpUrl: profile.cdpUrl,
@@ -310,6 +302,15 @@ export function createProfileTabOps({
       profileState.lastTargetId = createdViaCdp;
       const deadline = Date.now() + OPEN_TAB_DISCOVERY_WINDOW_MS;
       let lastTabs: BrowserTab[] = [];
+      // Tabs observed before we started openTab — these cannot be the newly
+      // created one, even if their URL matches (e.g. user already had the
+      // target URL open in another tab). We record them once and exclude them
+      // from the URL-based fallback.
+      const preExistingTargetIds = new Set(
+        await listTabs()
+          .then((tabs) => tabs.map((t) => t.targetId))
+          .catch(() => [] as string[]),
+      );
       while (Date.now() < deadline) {
         const tabs = await listTabs().catch(() => [] as BrowserTab[]);
         lastTabs = tabs;
