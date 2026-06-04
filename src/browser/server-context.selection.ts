@@ -26,42 +26,12 @@ type SelectionOps = {
 const EXTENSION_REATTACH_WAIT_MS = 10_000;
 const EXTENSION_REATTACH_POLL_MS = 200;
 
-// Final, short retry before failing tab resolution. Right after a
-// cross-process navigation the target tab is frequently *present* in
-// `/json/list` yet momentarily unresolvable here (id churn / a transient
-// empty or partial list from the relay), which surfaced as spurious
-// "tab not found" on snapshot/act calls even though a retry seconds later
-// succeeds. This is distinct from the navigation-reattach grace window: no
-// `navigation-reattach` detach is involved, the list itself is just briefly
-// inconsistent. Only applied to default/ephemeral requests — a genuinely bad
-// explicit (non-ephemeral) id still fails fast.
-const TAB_RESOLUTION_RETRY_MS =
-  Number(process.env.OPENCLAW_BROWSER_TAB_RESOLUTION_RETRY_MS) || 3_000;
-const TAB_RESOLUTION_RETRY_POLL_MS = 150;
-
 function isLikelyEphemeralTargetId(targetId: string): boolean {
   return /^\d+$/.test(targetId) || /^[a-f0-9]{16,}$/i.test(targetId);
 }
 
 function isHttpPage(tab: BrowserTab): boolean {
   return (tab.type ?? "page") === "page" && /^https?:\/\//i.test(tab.url ?? "");
-}
-
-// Compact, log-safe summary of the candidate tabs at the moment resolution
-// failed, so we can root-cause the exact id/list mismatch from gateway logs.
-function summarizeTabsForLog(tabs: BrowserTab[]): string {
-  try {
-    return JSON.stringify(
-      tabs.map((t) => ({
-        targetId: t.targetId,
-        type: t.type ?? "page",
-        url: (t.url ?? "").slice(0, 80),
-        ws: Boolean(t.wsUrl),
-      })),
-    );
-  } catch {
-    return `<${tabs.length} tabs>`;
-  }
 }
 
 function findLastTab(
@@ -191,48 +161,6 @@ export function createProfileSelectionOps({
     // transient detach/reattach never causes us to switch to another tab.
     if (!chosen && targetId && isLikelyEphemeralTargetId(targetId)) {
       chosen = pickStaleTargetFallback();
-    }
-
-    // Mitigation + diagnostics: the target tab is often present a moment later
-    // even though it failed to resolve right now (see TAB_RESOLUTION_RETRY_MS).
-    // Re-list and re-resolve for a short window before giving up — but only for
-    // default/ephemeral requests, never for an explicit non-ephemeral id that a
-    // caller supplied wrongly. We also log what `/json/list` actually contained
-    // so the residual root cause can be pinned precisely.
-    if (
-      !chosen &&
-      capabilities.requiresAttachedTab &&
-      (targetId === undefined || isLikelyEphemeralTargetId(targetId))
-    ) {
-      const startedAt = Date.now();
-      console.warn(
-        `[browser/selection] tab-not-found before retry: requested=${
-          targetId ?? "(default)"
-        } last=${profileState.lastTargetId ?? "-"} supportsPerTabWs=${
-          capabilities.supportsPerTabWs
-        } candidates=${summarizeTabsForLog(candidates)}`,
-      );
-      const retryDeadline = startedAt + TAB_RESOLUTION_RETRY_MS;
-      while (!chosen && Date.now() < retryDeadline) {
-        await new Promise((resolve) => setTimeout(resolve, TAB_RESOLUTION_RETRY_POLL_MS));
-        tabs = await listTabs();
-        candidates = capabilities.supportsPerTabWs ? tabs.filter((t) => Boolean(t.wsUrl)) : tabs;
-        chosen = targetId ? resolveById(targetId) : pickDefault();
-        if (!chosen && targetId && isLikelyEphemeralTargetId(targetId)) {
-          chosen = pickStaleTargetFallback();
-        }
-      }
-      if (chosen && chosen !== "AMBIGUOUS") {
-        console.warn(
-          `[browser/selection] tab resolved after ${Date.now() - startedAt}ms retry -> ${chosen.targetId}`,
-        );
-      } else {
-        console.warn(
-          `[browser/selection] tab still not found after ${
-            Date.now() - startedAt
-          }ms retry; candidates=${summarizeTabsForLog(candidates)}`,
-        );
-      }
     }
 
     if (chosen === "AMBIGUOUS") {
