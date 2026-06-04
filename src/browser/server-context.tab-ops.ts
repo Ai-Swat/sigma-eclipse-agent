@@ -310,32 +310,6 @@ export function createProfileTabOps({
     if (createdViaCdp) {
       const profileState = getProfileState();
       profileState.lastTargetId = createdViaCdp;
-
-      // Over the extension relay (usesPersistentPlaywright=false, so we reach
-      // this CDP path), `Target.createTarget {url}` creates the tab but does NOT
-      // navigate it to the requested URL — the cross-process commit is not
-      // honored over the relay, so the tab is left on about:blank while the
-      // result optimistically reports the requested URL. The agent then snapshots
-      // an empty page. Drive the navigation explicitly via raw CDP Page.navigate
-      // (addressed by targetId), which the relay does forward, and confirm the
-      // commit before returning.
-      if (capabilities.requiresRelay) {
-        const mod = await getPwAiModule({ mode: "soft" }).catch(() => null);
-        const navigateTargetViaCdpOverRelay = (mod as Partial<PwAiModule> | null)
-          ?.navigateTargetViaCdpOverRelay;
-        if (typeof navigateTargetViaCdpOverRelay === "function") {
-          const navigated = await navigateTargetViaCdpOverRelay({
-            cdpUrl: profile.cdpUrl,
-            targetId: createdViaCdp,
-            url,
-            timeoutMs: 30_000,
-          });
-          await assertBrowserNavigationResultAllowed({ url: navigated.url, ...ssrfPolicyOpts });
-          triggerManagedTabLimit(createdViaCdp);
-          return { targetId: createdViaCdp, title: "", url: navigated.url, type: "page" };
-        }
-      }
-
       const deadline = Date.now() + OPEN_TAB_DISCOVERY_WINDOW_MS;
       let lastTabs: BrowserTab[] = [];
       while (Date.now() < deadline) {
