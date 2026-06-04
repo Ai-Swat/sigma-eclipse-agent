@@ -142,62 +142,6 @@ describe("browser server-context ensureTabAvailable", () => {
     expect(selected.targetId).toBe("2940998");
   });
 
-  it("waits for the ephemeral last target to reappear instead of hijacking another tab", async () => {
-    vi.useFakeTimers();
-    try {
-      const present = [
-        {
-          id: "999111",
-          type: "page",
-          url: "https://wiki.example/Denver",
-          webSocketDebuggerUrl: "ws://x/wiki",
-        },
-        {
-          id: "555000",
-          type: "page",
-          url: "sigma://settings/agentSettings",
-          webSocketDebuggerUrl: "ws://x/settings",
-        },
-      ];
-      // During the navigation-reattach window the target tab is temporarily
-      // gone; only an unrelated sigma:// tab is listed.
-      const missing = [
-        {
-          id: "555000",
-          type: "page",
-          url: "sigma://settings/agentSettings",
-          webSocketDebuggerUrl: "ws://x/settings",
-        },
-      ];
-      const responses = [
-        // First call resolves and remembers the ephemeral target.
-        present,
-        present,
-        // Second call: target missing twice, then it re-announces.
-        missing,
-        missing,
-        missing,
-        present,
-      ];
-      stubChromeJsonList(responses);
-      const state = makeBrowserState();
-
-      const ctx = createBrowserRouteContext({ getState: () => state });
-      const chrome = ctx.forProfile("chrome-relay");
-
-      const first = await chrome.ensureTabAvailable("999111");
-      expect(first.targetId).toBe("999111");
-
-      const secondPromise = chrome.ensureTabAvailable("999111");
-      await vi.advanceTimersByTimeAsync(500);
-      const second = await secondPromise;
-      // Must wait for "999111" to come back — NOT fall back to the sigma:// tab.
-      expect(second.targetId).toBe("999111");
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it("returns a descriptive message when no extension tabs are attached", async () => {
     const responses = [[]];
     stubChromeJsonList(responses);

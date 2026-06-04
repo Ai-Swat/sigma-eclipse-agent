@@ -74,7 +74,6 @@ type AttachedToTargetEvent = {
 type DetachedFromTargetEvent = {
   sessionId: string;
   targetId?: string;
-  reason?: string;
 };
 
 type ConnectedTarget = {
@@ -86,15 +85,6 @@ type ConnectedTarget = {
 const RELAY_AUTH_HEADER = "x-openclaw-relay-token";
 const DEFAULT_EXTENSION_RECONNECT_GRACE_MS = 20_000;
 const DEFAULT_EXTENSION_COMMAND_RECONNECT_WAIT_MS = 3_000;
-// During a cross-process navigation the extension detaches the debugger and
-// re-attaches a fresh CDP session under the same stable targetId. The extension
-// announces this with a `Target.detachedFromTarget` carrying reason
-// `navigation-reattach`. If we dropped the target immediately, it would vanish
-// from `/json/list` for the whole re-attach window (~0.2-7.7s), making any
-// `navigate`/`snapshot` in that window fail with "tab not found". Instead we
-// keep the target listed for a grace period and let the re-attach replace it.
-const NAVIGATION_REATTACH_REASON = "navigation-reattach";
-const DEFAULT_NAVIGATION_REATTACH_GRACE_MS = 10_000;
 
 function headerValue(value: string | string[] | undefined): string | undefined {
   if (!value) {
@@ -269,10 +259,6 @@ export async function ensureChromeExtensionRelayServer(opts: {
     "OPENCLAW_EXTENSION_RELAY_COMMAND_RECONNECT_WAIT_MS",
     DEFAULT_EXTENSION_COMMAND_RECONNECT_WAIT_MS,
   );
-  const navigationReattachGraceMs = envMsOrDefault(
-    "OPENCLAW_EXTENSION_RELAY_NAVIGATION_REATTACH_GRACE_MS",
-    DEFAULT_NAVIGATION_REATTACH_GRACE_MS,
-  );
 
   const initPromise = (async (): Promise<ChromeExtensionRelayServer> => {
     const relayAuthToken = await resolveRelayAuthTokenForPort(info.port);
@@ -281,10 +267,6 @@ export async function ensureChromeExtensionRelayServer(opts: {
     let extensionWs: WebSocket | null = null;
     const cdpClients = new Set<WebSocket>();
     const connectedTargets = new Map<string, ConnectedTarget>();
-    // targetId -> timer that drops a target if it is not re-attached before the
-    // navigation re-attach grace window elapses. Keyed by stable targetId so a
-    // re-attach (which arrives under a fresh sessionId) can cancel it.
-    const navigationReattachTimers = new Map<string, NodeJS.Timeout>();
     const extensionConnected = () => extensionWs?.readyState === WebSocket.OPEN;
     const hasConnectedTargets = () => connectedTargets.size > 0;
     let extensionDisconnectCleanupTimer: NodeJS.Timeout | null = null;
@@ -311,10 +293,6 @@ export async function ensureChromeExtensionRelayServer(opts: {
 
     const closeCdpClientsAfterExtensionDisconnect = () => {
       connectedTargets.clear();
-      for (const timer of navigationReattachTimers.values()) {
-        clearTimeout(timer);
-      }
-      navigationReattachTimers.clear();
       for (const client of cdpClients) {
         try {
           client.close(1011, "extension disconnected");
@@ -431,31 +409,6 @@ export async function ensureChromeExtensionRelayServer(opts: {
         },
         sessionId: target.sessionId,
       });
-    };
-
-    const clearNavigationReattachTimer = (targetId: string) => {
-      const timer = navigationReattachTimers.get(targetId);
-      if (!timer) {
-        return;
-      }
-      clearTimeout(timer);
-      navigationReattachTimers.delete(targetId);
-    };
-
-    // Keep a detached-for-navigation target listed in `/json/list` for a grace
-    // window. If the extension re-attaches the tab (fresh sessionId, same stable
-    // targetId) before the timer fires, the attach handler cancels it. Otherwise
-    // we finally drop the stale entry and notify CDP clients.
-    const scheduleNavigationReattachDrop = (targetId: string) => {
-      clearNavigationReattachTimer(targetId);
-      const timer = setTimeout(() => {
-        navigationReattachTimers.delete(targetId);
-        const removed = dropConnectedTargetsByTargetId(targetId);
-        for (const target of removed) {
-          broadcastDetachedTarget(target, targetId);
-        }
-      }, navigationReattachGraceMs);
-      navigationReattachTimers.set(targetId, timer);
     };
 
     const isMissingTargetError = (err: unknown) => {
@@ -866,23 +819,6 @@ export async function ensureChromeExtensionRelayServer(opts: {
               const nextTargetId = attached.targetInfo.targetId;
               const prevTargetId = prev?.targetId;
               const changedTarget = Boolean(prev && prevTargetId && prevTargetId !== nextTargetId);
-              // A navigation re-attach reuses the stable targetId under a brand new
-              // sessionId. Cancel the pending grace drop and replace any stale
-              // entries that still carry this targetId under a different sessionId,
-              // so the tab is never duplicated in /json/list and the "hole" left
-              // by the detach is closed.
-              clearNavigationReattachTimer(nextTargetId);
-              for (const [existingSessionId, existing] of connectedTargets) {
-                if (existingSessionId === attached.sessionId) {
-                  continue;
-                }
-                if (
-                  existing.targetId === nextTargetId ||
-                  existing.targetInfo.cdpTargetId === nextTargetId
-                ) {
-                  connectedTargets.delete(existingSessionId);
-                }
-              }
               connectedTargets.set(attached.sessionId, {
                 sessionId: attached.sessionId,
                 targetId: nextTargetId,
@@ -904,23 +840,6 @@ export async function ensureChromeExtensionRelayServer(opts: {
 
           if (method === "Target.detachedFromTarget") {
             const detached = (params ?? {}) as DetachedFromTargetEvent;
-            // A navigation-driven render-process swap detaches the debugger and
-            // immediately re-attaches under the same stable targetId. Keep the
-            // target listed during a grace window instead of dropping it (and
-            // suppressing the detach broadcast), so a `navigate`/`snapshot` that
-            // races the re-attach still resolves the tab. If no re-attach arrives
-            // within the grace window, the timer drops + broadcasts the detach.
-            if (detached?.reason === NAVIGATION_REATTACH_REASON) {
-              const graceTargetId =
-                detached.targetId ??
-                (detached.sessionId
-                  ? connectedTargets.get(detached.sessionId)?.targetId
-                  : undefined);
-              if (graceTargetId) {
-                scheduleNavigationReattachDrop(graceTargetId);
-                return;
-              }
-            }
             if (detached?.sessionId) {
               dropConnectedTargetSession(detached.sessionId);
             } else if (detached?.targetId) {
@@ -1103,10 +1022,6 @@ export async function ensureChromeExtensionRelayServer(opts: {
       stop: async () => {
         relayRuntimeByPort.delete(port);
         clearExtensionDisconnectCleanupTimer();
-        for (const timer of navigationReattachTimers.values()) {
-          clearTimeout(timer);
-        }
-        navigationReattachTimers.clear();
         flushExtensionReconnectWaiters(false);
         for (const [, pending] of pendingExtension) {
           clearTimeout(pending.timer);

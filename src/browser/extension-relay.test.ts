@@ -149,12 +149,10 @@ describe("chrome extension relay server", () => {
       "OPENCLAW_GATEWAY_TOKEN",
       "OPENCLAW_EXTENSION_RELAY_RECONNECT_GRACE_MS",
       "OPENCLAW_EXTENSION_RELAY_COMMAND_RECONNECT_WAIT_MS",
-      "OPENCLAW_EXTENSION_RELAY_NAVIGATION_REATTACH_GRACE_MS",
     ]);
     process.env.OPENCLAW_GATEWAY_TOKEN = TEST_GATEWAY_TOKEN;
     delete process.env.OPENCLAW_EXTENSION_RELAY_RECONNECT_GRACE_MS;
     delete process.env.OPENCLAW_EXTENSION_RELAY_COMMAND_RECONNECT_WAIT_MS;
-    delete process.env.OPENCLAW_EXTENSION_RELAY_NAVIGATION_REATTACH_GRACE_MS;
   });
 
   afterEach(async () => {
@@ -938,155 +936,6 @@ describe("chrome extension relay server", () => {
     ).toBe("t2");
 
     cdp.close();
-    ext.close();
-  });
-
-  it(
-    "keeps targetId listed during navigation-reattach detach and replaces on reattach",
-    async () => {
-      const { ext } = await startRelayWithExtension();
-
-      ext.send(
-        JSON.stringify({
-          method: "forwardCDPEvent",
-          params: {
-            method: "Target.attachedToTarget",
-            params: {
-              sessionId: "cb-tab-nav-1",
-              targetInfo: {
-                targetId: "t-nav",
-                type: "page",
-                title: "Before nav",
-                url: "https://example.com",
-              },
-              waitingForDebugger: false,
-            },
-          },
-        }),
-      );
-
-      await waitForListMatch(
-        async () =>
-          (await fetch(`${cdpUrl}/json/list`, {
-            headers: relayAuthHeaders(cdpUrl),
-          }).then((r) => r.json())) as Array<{ id?: string }>,
-        (list) => list.some((t) => t.id === "t-nav"),
-      );
-
-      // Navigation-driven render-process swap: the extension detaches the
-      // debugger and announces a navigation-reattach. The relay must NOT drop
-      // the target — it stays listed through the (default ~10s) grace window.
-      ext.send(
-        JSON.stringify({
-          method: "forwardCDPEvent",
-          params: {
-            method: "Target.detachedFromTarget",
-            params: {
-              sessionId: "cb-tab-nav-1",
-              targetId: "t-nav",
-              reason: "navigation-reattach",
-            },
-          },
-        }),
-      );
-
-      await new Promise((r) => setTimeout(r, 150));
-      const during = (await fetch(`${cdpUrl}/json/list`, {
-        headers: relayAuthHeaders(cdpUrl),
-      }).then((r) => r.json())) as Array<{ id?: string }>;
-      expect(during.some((t) => t.id === "t-nav")).toBe(true);
-
-      // Re-attach arrives under a FRESH session id but the same stable
-      // targetId. The relay replaces the prior entry (no duplicates) and
-      // cancels the grace timer.
-      ext.send(
-        JSON.stringify({
-          method: "forwardCDPEvent",
-          params: {
-            method: "Target.attachedToTarget",
-            params: {
-              sessionId: "cb-tab-nav-2",
-              targetInfo: {
-                targetId: "t-nav",
-                type: "page",
-                title: "After nav",
-                url: "https://example.com/landing",
-              },
-              waitingForDebugger: false,
-            },
-          },
-        }),
-      );
-
-      const after = await waitForListMatch(
-        async () =>
-          (await fetch(`${cdpUrl}/json/list`, {
-            headers: relayAuthHeaders(cdpUrl),
-          }).then((r) => r.json())) as Array<{ id?: string; url?: string }>,
-        (list) => list.some((t) => t.id === "t-nav" && t.url === "https://example.com/landing"),
-      );
-      expect(after.filter((t) => t.id === "t-nav").length).toBe(1);
-
-      ext.close();
-    },
-    RELAY_TEST_TIMEOUT_MS,
-  );
-
-  it("drops target after navigation-reattach grace expires without reattach", async () => {
-    process.env.OPENCLAW_EXTENSION_RELAY_NAVIGATION_REATTACH_GRACE_MS = "150";
-
-    const { ext } = await startRelayWithExtension();
-
-    ext.send(
-      JSON.stringify({
-        method: "forwardCDPEvent",
-        params: {
-          method: "Target.attachedToTarget",
-          params: {
-            sessionId: "cb-tab-nav-expire",
-            targetInfo: {
-              targetId: "t-nav-expire",
-              type: "page",
-              title: "Before nav",
-              url: "https://example.com",
-            },
-            waitingForDebugger: false,
-          },
-        },
-      }),
-    );
-
-    await waitForListMatch(
-      async () =>
-        (await fetch(`${cdpUrl}/json/list`, {
-          headers: relayAuthHeaders(cdpUrl),
-        }).then((r) => r.json())) as Array<{ id?: string }>,
-      (list) => list.some((t) => t.id === "t-nav-expire"),
-    );
-
-    ext.send(
-      JSON.stringify({
-        method: "forwardCDPEvent",
-        params: {
-          method: "Target.detachedFromTarget",
-          params: {
-            sessionId: "cb-tab-nav-expire",
-            targetId: "t-nav-expire",
-            reason: "navigation-reattach",
-          },
-        },
-      }),
-    );
-
-    // No re-attach arrives → after the grace window the target is dropped.
-    await waitForListMatch(
-      async () =>
-        (await fetch(`${cdpUrl}/json/list`, {
-          headers: relayAuthHeaders(cdpUrl),
-        }).then((r) => r.json())) as Array<{ id?: string }>,
-      (list) => list.every((t) => t.id !== "t-nav-expire"),
-    );
-
     ext.close();
   });
 

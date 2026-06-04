@@ -126,26 +126,14 @@ export function createProfileSelectionOps({
     };
 
     let chosen = targetId ? resolveById(targetId) : pickDefault();
+    if (!chosen && targetId && isLikelyEphemeralTargetId(targetId)) {
+      chosen = pickStaleTargetFallback();
+    }
 
-    // When an explicit ephemeral targetId is requested (or we are resolving the
-    // remembered lastTargetId) but it is currently missing, it is very likely
-    // mid navigation-reattach: the debugger detached during a cross-process
-    // navigation and has not re-attached yet, so the relay's grace window is
-    // still holding/restoring the target. Wait for it to reappear BEFORE
-    // falling back to another tab — otherwise we'd silently hijack an unrelated
-    // tab (e.g. a sigma:// page) and surface the navigation on the wrong target.
     if (!chosen && capabilities.requiresAttachedTab) {
-      const lastTargetId = profileState.lastTargetId?.trim() || "";
-      const wantedTargetId = targetId?.trim() || lastTargetId;
-      // Only wait when the missing id is one we previously resolved
-      // (== lastTargetId). That is the navigation-reattach case: the same
-      // stable targetId is briefly gone while the relay grace window restores
-      // it. An arbitrary/unknown ephemeral id (never used by us) must NOT block
-      // here — it falls straight through to the stale-target fallback below.
+      const wantedTargetId = targetId?.trim() || profileState.lastTargetId?.trim() || "";
       const shouldWaitForTarget =
-        Boolean(wantedTargetId) &&
-        isLikelyEphemeralTargetId(wantedTargetId) &&
-        (!targetId || wantedTargetId === lastTargetId);
+        Boolean(wantedTargetId) && (!targetId || isLikelyEphemeralTargetId(wantedTargetId));
       if (shouldWaitForTarget) {
         const deadlineAt = Date.now() + EXTENSION_REATTACH_WAIT_MS;
         while (!chosen && Date.now() < deadlineAt) {
@@ -155,12 +143,9 @@ export function createProfileSelectionOps({
           chosen = targetId ? resolveById(targetId) : pickDefault();
         }
       }
-    }
-
-    // Only after the reattach wait do we accept a stale-target fallback, so a
-    // transient detach/reattach never causes us to switch to another tab.
-    if (!chosen && targetId && isLikelyEphemeralTargetId(targetId)) {
-      chosen = pickStaleTargetFallback();
+      if (!chosen && targetId && isLikelyEphemeralTargetId(targetId)) {
+        chosen = pickStaleTargetFallback();
+      }
     }
 
     if (chosen === "AMBIGUOUS") {
