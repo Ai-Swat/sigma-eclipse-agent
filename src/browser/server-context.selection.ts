@@ -23,30 +23,6 @@ type SelectionOps = {
   closeTab: (targetId: string) => Promise<void>;
 };
 
-const EXTENSION_REATTACH_WAIT_MS = 10_000;
-const EXTENSION_REATTACH_POLL_MS = 200;
-
-function isLikelyEphemeralTargetId(targetId: string): boolean {
-  return /^\d+$/.test(targetId) || /^[a-f0-9]{16,}$/i.test(targetId);
-}
-
-function isHttpPage(tab: BrowserTab): boolean {
-  return (tab.type ?? "page") === "page" && /^https?:\/\//i.test(tab.url ?? "");
-}
-
-function findLastTab(
-  tabs: BrowserTab[],
-  predicate: (tab: BrowserTab) => boolean,
-): BrowserTab | null {
-  for (let i = tabs.length - 1; i >= 0; i -= 1) {
-    const tab = tabs[i];
-    if (tab && predicate(tab)) {
-      return tab;
-    }
-  }
-  return null;
-}
-
 export function createProfileSelectionOps({
   profile,
   getProfileState,
@@ -67,9 +43,9 @@ export function createProfileSelectionOps({
         // lifecycle, relay restart). If we previously had a target selected, wait briefly for
         // the extension to reconnect and re-announce its attached tabs before failing.
         if (profileState.lastTargetId?.trim()) {
-          const deadlineAt = Date.now() + EXTENSION_REATTACH_WAIT_MS;
+          const deadlineAt = Date.now() + 3_000;
           while (tabs1.length === 0 && Date.now() < deadlineAt) {
-            await new Promise((resolve) => setTimeout(resolve, EXTENSION_REATTACH_POLL_MS));
+            await new Promise((resolve) => setTimeout(resolve, 200));
             tabs1 = await listTabs();
           }
         }
@@ -84,8 +60,8 @@ export function createProfileSelectionOps({
       }
     }
 
-    let tabs = await listTabs();
-    let candidates = capabilities.supportsPerTabWs ? tabs.filter((t) => Boolean(t.wsUrl)) : tabs;
+    const tabs = await listTabs();
+    const candidates = capabilities.supportsPerTabWs ? tabs.filter((t) => Boolean(t.wsUrl)) : tabs;
 
     const resolveById = (raw: string) => {
       const resolved = resolveTargetIdFromTabs(raw, candidates);
@@ -104,49 +80,12 @@ export function createProfileSelectionOps({
       if (lastResolved && lastResolved !== "AMBIGUOUS") {
         return lastResolved;
       }
-      if (last && capabilities.requiresAttachedTab) {
-        const httpPage = findLastTab(candidates, isHttpPage);
-        if (httpPage) {
-          return httpPage;
-        }
-      }
       // Prefer a real page tab first (avoid service workers/background targets).
       const page = candidates.find((t) => (t.type ?? "page") === "page");
       return page ?? candidates.at(0) ?? null;
     };
 
-    const pickStaleTargetFallback = () => {
-      if (!capabilities.requiresAttachedTab) {
-        return null;
-      }
-      // Extension tab ids can change during navigation/reattach. When the caller
-      // reuses a stale ephemeral id, prefer the latest real web page over
-      // internal pages or older about:blank tabs.
-      return findLastTab(candidates, isHttpPage) ?? pickDefault();
-    };
-
-    let chosen = targetId ? resolveById(targetId) : pickDefault();
-    if (!chosen && targetId && isLikelyEphemeralTargetId(targetId)) {
-      chosen = pickStaleTargetFallback();
-    }
-
-    if (!chosen && capabilities.requiresAttachedTab) {
-      const wantedTargetId = targetId?.trim() || profileState.lastTargetId?.trim() || "";
-      const shouldWaitForTarget =
-        Boolean(wantedTargetId) && (!targetId || isLikelyEphemeralTargetId(wantedTargetId));
-      if (shouldWaitForTarget) {
-        const deadlineAt = Date.now() + EXTENSION_REATTACH_WAIT_MS;
-        while (!chosen && Date.now() < deadlineAt) {
-          await new Promise((resolve) => setTimeout(resolve, EXTENSION_REATTACH_POLL_MS));
-          tabs = await listTabs();
-          candidates = capabilities.supportsPerTabWs ? tabs.filter((t) => Boolean(t.wsUrl)) : tabs;
-          chosen = targetId ? resolveById(targetId) : pickDefault();
-        }
-      }
-      if (!chosen && targetId && isLikelyEphemeralTargetId(targetId)) {
-        chosen = pickStaleTargetFallback();
-      }
-    }
+    const chosen = targetId ? resolveById(targetId) : pickDefault();
 
     if (chosen === "AMBIGUOUS") {
       throw new BrowserTargetAmbiguousError();

@@ -58,7 +58,6 @@ type ExtensionMessage =
 
 type TargetInfo = {
   targetId: string;
-  cdpTargetId?: string;
   type?: string;
   title?: string;
   url?: string;
@@ -391,7 +390,7 @@ export async function ensureChromeExtensionRelayServer(opts: {
     const dropConnectedTargetsByTargetId = (targetId: string): ConnectedTarget[] => {
       const removed: ConnectedTarget[] = [];
       for (const [sessionId, target] of connectedTargets) {
-        if (target.targetId !== targetId && target.targetInfo.cdpTargetId !== targetId) {
+        if (target.targetId !== targetId) {
           continue;
         }
         connectedTargets.delete(sessionId);
@@ -494,7 +493,7 @@ export async function ensureChromeExtensionRelayServer(opts: {
           const targetId = typeof params.targetId === "string" ? params.targetId : undefined;
           if (targetId) {
             for (const t of connectedTargets.values()) {
-              if (t.targetId === targetId || t.targetInfo.cdpTargetId === targetId) {
+              if (t.targetId === targetId) {
                 return { targetInfo: t.targetInfo };
               }
             }
@@ -625,7 +624,6 @@ export async function ensureChromeExtensionRelayServer(opts: {
       if (listPaths.has(path) && (req.method === "GET" || req.method === "PUT")) {
         const list = Array.from(connectedTargets.values()).map((t) => ({
           id: t.targetId,
-          cdpTargetId: t.targetInfo.cdpTargetId,
           type: t.targetInfo.type ?? "page",
           title: t.targetInfo.title ?? "",
           description: t.targetInfo.title ?? "",

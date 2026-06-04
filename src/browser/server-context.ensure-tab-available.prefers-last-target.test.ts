@@ -92,7 +92,7 @@ describe("browser server-context ensureTabAvailable", () => {
       getState: () => state,
     });
 
-    const chrome = ctx.forProfile("chrome-relay");
+    const chrome = ctx.forProfile("chrome");
     const first = await chrome.ensureTabAvailable();
     expect(first.targetId).toBe("A");
     const second = await chrome.ensureTabAvailable();
@@ -108,38 +108,8 @@ describe("browser server-context ensureTabAvailable", () => {
     const state = makeBrowserState();
 
     const ctx = createBrowserRouteContext({ getState: () => state });
-    const chrome = ctx.forProfile("chrome-relay");
+    const chrome = ctx.forProfile("chrome");
     await expect(chrome.ensureTabAvailable("NOT_A_TAB")).rejects.toThrow(/tab not found/i);
-  });
-
-  it("falls back from a stale extension tab id to the latest live web page", async () => {
-    const tabs = [
-      {
-        id: "2940971",
-        type: "page",
-        url: "sigma://settings/agentSettings",
-        webSocketDebuggerUrl: "ws://x/settings",
-      },
-      {
-        id: "2940981",
-        type: "page",
-        url: "about:blank",
-        webSocketDebuggerUrl: "ws://x/blank",
-      },
-      {
-        id: "2940998",
-        type: "page",
-        url: "https://example.com/wiki/Denver",
-        webSocketDebuggerUrl: "ws://x/wiki",
-      },
-    ];
-    stubChromeJsonList([tabs, tabs]);
-    const state = makeBrowserState();
-
-    const ctx = createBrowserRouteContext({ getState: () => state });
-    const chrome = ctx.forProfile("chrome-relay");
-    const selected = await chrome.ensureTabAvailable("2940990");
-    expect(selected.targetId).toBe("2940998");
   });
 
   it("returns a descriptive message when no extension tabs are attached", async () => {
@@ -148,8 +118,8 @@ describe("browser server-context ensureTabAvailable", () => {
     const state = makeBrowserState();
 
     const ctx = createBrowserRouteContext({ getState: () => state });
-    const chrome = ctx.forProfile("chrome-relay");
-    await expect(chrome.ensureTabAvailable()).rejects.toThrow(/no attached tabs/i);
+    const chrome = ctx.forProfile("chrome");
+    await expect(chrome.ensureTabAvailable()).rejects.toThrow(/no attached Chrome tabs/i);
   });
 
   it("waits briefly for extension tabs to reappear when a previous target exists", async () => {
@@ -168,7 +138,7 @@ describe("browser server-context ensureTabAvailable", () => {
       const state = makeBrowserState();
 
       const ctx = createBrowserRouteContext({ getState: () => state });
-      const chrome = ctx.forProfile("chrome-relay");
+      const chrome = ctx.forProfile("chrome");
       const first = await chrome.ensureTabAvailable();
       expect(first.targetId).toBe("A");
 
@@ -187,17 +157,19 @@ describe("browser server-context ensureTabAvailable", () => {
       const responses = [
         [{ id: "A", type: "page", url: "https://a.example", webSocketDebuggerUrl: "ws://x/a" }],
         [{ id: "A", type: "page", url: "https://a.example", webSocketDebuggerUrl: "ws://x/a" }],
-        ...Array.from({ length: 60 }, () => []),
+        ...Array.from({ length: 20 }, () => []),
       ];
       stubChromeJsonList(responses);
       const state = makeBrowserState();
 
       const ctx = createBrowserRouteContext({ getState: () => state });
-      const chrome = ctx.forProfile("chrome-relay");
+      const chrome = ctx.forProfile("chrome");
       await chrome.ensureTabAvailable();
 
-      const pending = expect(chrome.ensureTabAvailable()).rejects.toThrow(/no attached tabs/i);
-      await vi.advanceTimersByTimeAsync(10_500);
+      const pending = expect(chrome.ensureTabAvailable()).rejects.toThrow(
+        /no attached Chrome tabs/i,
+      );
+      await vi.advanceTimersByTimeAsync(3_500);
       await pending;
     } finally {
       vi.useRealTimers();

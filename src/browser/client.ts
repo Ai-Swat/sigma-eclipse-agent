@@ -49,8 +49,6 @@ export type BrowserResetProfileResult = {
 
 export type BrowserTab = {
   targetId: string;
-  /** CDP targetId alias when a relay exposes a stable extension tab id as targetId. */
-  cdpTargetId?: string;
   title: string;
   url: string;
   wsUrl?: string;

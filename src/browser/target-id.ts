@@ -4,31 +4,27 @@ export type TargetIdResolution =
 
 export function resolveTargetIdFromTabs(
   input: string,
-  tabs: Array<{ targetId: string; cdpTargetId?: string }>,
+  tabs: Array<{ targetId: string }>,
 ): TargetIdResolution {
   const needle = input.trim();
   if (!needle) {
     return { ok: false, reason: "not_found" };
   }
 
-  const exact = tabs.find((t) => t.targetId === needle || t.cdpTargetId === needle);
+  const exact = tabs.find((t) => t.targetId === needle);
   if (exact) {
     return { ok: true, targetId: exact.targetId };
   }
 
   const lower = needle.toLowerCase();
-  const matches = tabs.flatMap((tab) => {
-    const ids = [tab.targetId, tab.cdpTargetId].filter((id): id is string => Boolean(id));
-    return ids.some((id) => id.toLowerCase().startsWith(lower)) ? [tab.targetId] : [];
-  });
-  const uniqueMatches = [...new Set(matches)];
+  const matches = tabs.map((t) => t.targetId).filter((id) => id.toLowerCase().startsWith(lower));
 
-  const only = uniqueMatches.length === 1 ? uniqueMatches[0] : undefined;
+  const only = matches.length === 1 ? matches[0] : undefined;
   if (only) {
     return { ok: true, targetId: only };
   }
-  if (uniqueMatches.length === 0) {
+  if (matches.length === 0) {
     return { ok: false, reason: "not_found" };
   }
-  return { ok: false, reason: "ambiguous", matches: uniqueMatches };
+  return { ok: false, reason: "ambiguous", matches };
 }
