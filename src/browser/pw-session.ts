@@ -463,28 +463,6 @@ function matchPageByTargetList(
       }
     }
   }
-
-  // Positional fallback: over an extension relay Playwright frequently can't
-  // expose page URLs (page.url() === "" for every page) because CDP target
-  // attachment is blocked, so URL-based matching above is structurally
-  // impossible — not merely a transient miss. When that happens AND there's a
-  // clean 1:1 correspondence between Playwright pages and the relay's
-  // /json/list page targets, align by position. /json/list and
-  // browser.contexts().pages() both follow target creation order, which is the
-  // same ordering the urlMatch.length > 1 branch already relies on. This is the
-  // only signal available in this state, and it's strictly better than throwing
-  // "tab not found" for a target that demonstrably exists in /json/list.
-  const urlsUnavailable = pages.length > 0 && pages.every((page) => !page.url());
-  if (urlsUnavailable && pages.length === targets.length) {
-    const idx = targets.findIndex((entry) => entry.id === targetId);
-    if (idx >= 0 && idx < pages.length) {
-      console.warn(
-        `[pw-session] positional-fallback target=${targetId} idx=${idx}/${pages.length} ` +
-          `(playwright page urls unavailable over relay)`,
-      );
-      return pages[idx] ?? null;
-    }
-  }
   return null;
 }
 
