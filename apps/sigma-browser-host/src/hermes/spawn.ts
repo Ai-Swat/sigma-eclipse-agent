@@ -217,6 +217,9 @@ export function spawnHermesChild(params: {
   const env: Record<string, string> = {
     ...envWithoutProxies(),
     ...extraEnv,
+    // Loopback llama-server and CDP relay must never go through a proxy even
+    // when the parent browser process inherits Windows system proxy settings.
+    NO_PROXY: "127.0.0.1,localhost,::1",
     // Pin the Python module search path to the bundled site-packages so a
     // user's global Python install can never shadow our code.
     PYTHONPATH: path.join(paths.packDir, "python", "lib", "python3.11", "site-packages"),
