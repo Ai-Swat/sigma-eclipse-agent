@@ -82,6 +82,12 @@ type ConnectedTarget = {
 };
 
 const RELAY_AUTH_HEADER = "x-openclaw-relay-token";
+// Application-private WebSocket close code (4000-4999 range) used when a newer
+// authenticated extension connection evicts an older one. The extension client
+// recognizes this code and goes idle instead of fighting to reconnect, which
+// avoids a normal<->private browsing-context reconnect ping-pong over the single
+// relay slot.
+const EXTENSION_SUPERSEDED_CLOSE_CODE = 4009;
 const DEFAULT_EXTENSION_RECONNECT_GRACE_MS = 20_000;
 const DEFAULT_EXTENSION_COMMAND_RECONNECT_WAIT_MS = 3_000;
 
@@ -722,8 +728,24 @@ export async function ensureChromeExtensionRelayServer(opts: {
           extensionWs = null;
         }
         if (extensionConnected()) {
-          rejectUpgrade(socket, 409, "Extension already connected");
-          return;
+          // Newest authenticated connection wins. A still-OPEN extension socket
+          // here is almost always a zombie the MV3 service worker left behind
+          // when it was restarted (the old socket stays OPEN at the network
+          // layer even though its JS context is gone), or the normal<->private
+          // browsing context handing the single relay slot back and forth.
+          // Rejecting the newcomer with 409 would lock the active context out
+          // forever, so instead evict the stale socket and let the fresh one
+          // take over. The old socket's `close` handler is a no-op because the
+          // `extensionWs !== ws` guard fires once we reassign below.
+          try {
+            extensionWs?.close(
+              EXTENSION_SUPERSEDED_CLOSE_CODE,
+              "superseded by newer extension connection",
+            );
+          } catch {
+            // ignore — best-effort close of the evicted socket
+          }
+          extensionWs = null;
         }
         wssExtension.handleUpgrade(req, socket, head, (ws) => {
           wssExtension.emit("connection", ws, req);

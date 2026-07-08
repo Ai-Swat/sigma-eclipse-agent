@@ -322,7 +322,7 @@ describe("chrome extension relay server", () => {
     expect(err.message).toContain("401");
   });
 
-  it("rejects a second live extension connection with 409", async () => {
+  it("evicts the prior extension connection when a newer one connects (newest-wins)", async () => {
     const port = await getFreePort();
     cdpUrl = `http://127.0.0.1:${port}`;
     await ensureChromeExtensionRelayServer({ cdpUrl });
@@ -332,13 +332,28 @@ describe("chrome extension relay server", () => {
     });
     await waitForOpen(ext1);
 
+    // The previous socket must be evicted with the app-private "superseded"
+    // close code so the extension client can recognize the handoff and go idle
+    // instead of reconnecting (which would ping-pong the single relay slot).
+    const ext1Closed = new Promise<{ code: number }>((resolve) => {
+      ext1.once("close", (code) => resolve({ code }));
+    });
+
     const ext2 = new WebSocket(`ws://127.0.0.1:${port}/extension`, {
       headers: relayAuthHeaders(`ws://127.0.0.1:${port}/extension`),
     });
-    const err = await waitForError(ext2);
-    expect(err.message).toContain("409");
+    // The newcomer wins the slot instead of being rejected with 409.
+    await waitForOpen(ext2);
 
-    ext1.close();
+    const closed = await ext1Closed;
+    expect(closed.code).toBe(4009);
+
+    const status = (await fetch(`${cdpUrl}/extension/status`).then((r) => r.json())) as {
+      connected?: boolean;
+    };
+    expect(status.connected).toBe(true);
+
+    ext2.close();
   });
 
   it("allows immediate reconnect when prior extension socket is closing", async () => {
