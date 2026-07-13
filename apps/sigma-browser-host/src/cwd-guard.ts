@@ -140,10 +140,17 @@ export function buildNodeOptionsWithGuard(
   existing: string | undefined,
 ): string | undefined {
   if (!guardPath) {return existing;}
-  // `--require` needs the absolute path quoted if it has spaces (it does
-  // on macOS: "Application Support"). NODE_OPTIONS parses space-separated
-  // tokens but treats backslash-quoted spaces correctly.
-  const quoted = guardPath.includes(" ") ? `"${guardPath}"` : guardPath;
+  // NODE_OPTIONS is tokenized by Node with shell-like rules: backslash is an
+  // ESCAPE character, so a Windows path like
+  //   C:\Users\me\User Data\openclaw\cwd-guard.cjs
+  // gets its separators eaten and Node ends up trying to require
+  //   C:UsersmeUser Dataopenclawcwd-guard.cjs  -> MODULE_NOT_FOUND.
+  // Node accepts forward slashes in `require` paths on every platform, so
+  // normalise separators before injecting. On POSIX this is a no-op (paths
+  // have no backslashes). Spaces (e.g. macOS "Application Support",
+  // Windows "User Data") still need the token quoted.
+  const normalized = guardPath.replace(/\\/g, "/");
+  const quoted = normalized.includes(" ") ? `"${normalized}"` : normalized;
   const flag = `--require ${quoted}`;
   if (!existing || existing.trim() === "") {return flag;}
   // Avoid duplicating the flag if the parent already injected it.
