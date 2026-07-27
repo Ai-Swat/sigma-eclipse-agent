@@ -231,6 +231,7 @@ export function spawnHermesChild(params: {
     SIGMA_HERMES_RPC_PORT: String(config.hermesRpcPort),
     SIGMA_LLAMA_PORT: String(config.llamaPort > 0 ? config.llamaPort : 8787),
     SIGMA_HERMES_LOGS_DIR: logsDir,
+    SIGMA_HERMES_FILES_DIR: path.join(paths.stateDir, "files"),
     // Pre-emptively disable color codes — we mirror stdout/stderr to a flat
     // log file and cleanliness > styling for postmortems.
     NO_COLOR: "1",

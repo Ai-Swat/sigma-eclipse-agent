@@ -70,6 +70,22 @@
           "label": "snapshot",
           "detailKeys": ["targetUrl", "targetId", "ref", "element", "format"]
         },
+        "read": {
+          "label": "read",
+          "detailKeys": ["targetId", "selector", "offset", "maxChars"]
+        },
+        "table": {
+          "label": "table",
+          "detailKeys": ["targetId", "selector", "index", "offset", "maxRows"]
+        },
+        "search": {
+          "label": "search",
+          "detailKeys": ["query", "engine", "maxResults"]
+        },
+        "download": {
+          "label": "download",
+          "detailKeys": ["targetId", "ref", "path"]
+        },
         "screenshot": {
           "label": "screenshot",
           "detailKeys": ["targetUrl", "targetId", "ref", "element"]

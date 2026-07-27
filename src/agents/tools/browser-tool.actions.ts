@@ -1,5 +1,11 @@
 import type { AgentToolResult } from "@mariozechner/pi-agent-core";
-import { browserAct, browserConsoleMessages } from "../../browser/client-actions.js";
+import {
+  browserAct,
+  browserConsoleMessages,
+  browserReadPage,
+  browserReadTable,
+  browserSearch,
+} from "../../browser/client-actions.js";
 import { browserSnapshot, browserTabs } from "../../browser/client.js";
 import { DEFAULT_AI_SNAPSHOT_MAX_CHARS } from "../../browser/constants.js";
 import { loadConfig } from "../../config/config.js";
@@ -16,7 +22,7 @@ type BrowserProxyRequest = (opts: {
 }) => Promise<unknown>;
 
 function wrapBrowserExternalJson(params: {
-  kind: "snapshot" | "console" | "tabs";
+  kind: "snapshot" | "console" | "tabs" | "read" | "table" | "search";
   payload: unknown;
   includeWarning?: boolean;
 }): { wrappedText: string; safeDetails: Record<string, unknown> } {
@@ -121,6 +127,74 @@ export async function executeTabsAction(params: {
   }
   const tabs = await browserTabs(baseUrl, { profile });
   return formatTabsToolResult(tabs);
+}
+
+export async function executeResearchAction(params: {
+  action: "read" | "table" | "search";
+  input: Record<string, unknown>;
+  baseUrl?: string;
+  profile?: string;
+  proxyRequest: BrowserProxyRequest | null;
+}): Promise<AgentToolResult<unknown>> {
+  const { action, input, baseUrl, profile, proxyRequest } = params;
+  const body =
+    action === "read"
+      ? {
+          targetId: input.targetId,
+          selector: input.selector,
+          maxChars: input.maxChars,
+          offset: input.offset,
+        }
+      : action === "table"
+        ? {
+            targetId: input.targetId,
+            selector: input.selector,
+            index: input.index,
+            maxRows: input.maxRows,
+            offset: input.offset,
+          }
+        : {
+            targetId: input.targetId,
+            query: input.query,
+            engine: input.engine,
+            maxResults: input.maxResults,
+          };
+  const attempt = async (requestBody: Record<string, unknown>) =>
+    proxyRequest
+      ? await proxyRequest({
+          method: "POST",
+          path: `/${action}`,
+          profile,
+          body: requestBody,
+          timeoutMs: 30_000,
+        })
+      : action === "read"
+        ? await browserReadPage(baseUrl, requestBody, profile)
+        : action === "table"
+          ? await browserReadTable(baseUrl, requestBody, profile)
+          : await browserSearch(baseUrl, requestBody, profile);
+  let result: unknown;
+  try {
+    result = await attempt(body);
+  } catch (error) {
+    if (!body.targetId || !isRelayStaleTargetError(profile, error)) {
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    result = await attempt({ ...body, targetId: undefined });
+  }
+  const wrapped = wrapBrowserExternalJson({ kind: action, payload: result });
+  return {
+    content: [{ type: "text", text: wrapped.wrappedText }],
+    details: {
+      ...wrapped.safeDetails,
+      action,
+      targetId:
+        result && typeof result === "object" && "targetId" in result
+          ? (result as { targetId?: unknown }).targetId
+          : undefined,
+    },
+  };
 }
 
 export async function executeSnapshotAction(params: {
