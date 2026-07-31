@@ -1,0 +1,77 @@
+[
+  {
+    "id": "article-date",
+    "kind": "read",
+    "html": "<main><h1>Mission report</h1><p>Launch date: 17 July 2026.</p></main>",
+    "expected": "17 July 2026"
+  },
+  {
+    "id": "product-price",
+    "kind": "read",
+    "html": "<article><h1>Field recorder</h1><p>Current price: €1,249.95</p></article>",
+    "expected": "€1,249.95"
+  },
+  {
+    "id": "selector-scope",
+    "kind": "read",
+    "html": "<body><aside>Noise 999</aside><section id=\"answer\"><p>Enrollment: 284 participants</p></section></body>",
+    "request": { "selector": "#answer" },
+    "expected": "284 participants"
+  },
+  {
+    "id": "linked-source",
+    "kind": "read",
+    "html": "<main><p>Read the <a href=\"https://example.test/source\">primary source</a>.</p></main>",
+    "expected": "https://example.test/source"
+  },
+  {
+    "id": "list-content",
+    "kind": "read",
+    "html": "<main><h2>Finalists</h2><ul><li>Ada</li><li>Grace</li><li>Linus</li></ul></main>",
+    "expected": "Grace"
+  },
+  {
+    "id": "page-pagination",
+    "kind": "read",
+    "html": "<main><p>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</p><p>SECOND PAGE VALUE 73</p></main>",
+    "request": { "maxChars": 256, "offset": 240 },
+    "expected": "SECOND PAGE VALUE 73"
+  },
+  {
+    "id": "financial-table",
+    "kind": "table",
+    "html": "<table><thead><tr><th>Year</th><th>Revenue</th></tr></thead><tbody><tr><td>2025</td><td>$42.7M</td></tr></tbody></table>",
+    "expected": "$42.7M"
+  },
+  {
+    "id": "second-table-index",
+    "kind": "table",
+    "html": "<table><tr><td>Ignore</td></tr></table><table aria-label=\"Population\"><tr><th>City</th><th>People</th></tr><tr><td>Delta</td><td>91,204</td></tr></table>",
+    "request": { "index": 1 },
+    "expected": "91,204"
+  },
+  {
+    "id": "aria-grid",
+    "kind": "table",
+    "html": "<div role=\"grid\" aria-label=\"Scores\"><div role=\"row\"><span role=\"columnheader\">Team</span><span role=\"columnheader\">Score</span></div><div role=\"row\"><span role=\"gridcell\">Sigma</span><span role=\"gridcell\">98.6</span></div></div>",
+    "expected": "98.6"
+  },
+  {
+    "id": "google-serp",
+    "kind": "search",
+    "html": "<main id=\"search\"><div class=\"g\"><a href=\"https://example.test/google\"><h3>Google result</h3></a><div class=\"VwiC3b\">Exact snippet 314</div></div></main>",
+    "expected": "Exact snippet 314"
+  },
+  {
+    "id": "bing-serp",
+    "kind": "search",
+    "html": "<ol><li class=\"b_algo\"><h2><a href=\"https://example.test/bing\">Bing result</a></h2><div class=\"b_caption\"><p>Exact snippet 2718</p></div></li></ol>",
+    "expected": "Exact snippet 2718"
+  },
+  {
+    "id": "duckduckgo-serp",
+    "kind": "search",
+    "html": "<main><div class=\"result\"><h2><a href=\"https://example.test/ddg\">Duck result</a></h2><p class=\"result__snippet\">Exact snippet 1618</p></div></main>",
+    "expected": "Exact snippet 1618"
+  }
+]

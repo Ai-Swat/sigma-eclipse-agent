@@ -131,6 +131,52 @@ export type BrowserDownloadPayload = {
 
 type BrowserDownloadResult = { ok: true; targetId: string; download: BrowserDownloadPayload };
 
+export type BrowserResearchResponse = {
+  targetId: string;
+  query?: string;
+  engine?: string;
+  result: unknown;
+};
+
+async function postResearchRequest(
+  baseUrl: string | undefined,
+  route: "/read" | "/table" | "/search",
+  body: Record<string, unknown>,
+  profile?: string,
+): Promise<BrowserResearchResponse> {
+  const q = buildProfileQuery(profile);
+  return await fetchBrowserJson<BrowserResearchResponse>(withBaseUrl(baseUrl, `${route}${q}`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    timeoutMs: 30_000,
+  });
+}
+
+export async function browserReadPage(
+  baseUrl: string | undefined,
+  request: Record<string, unknown>,
+  profile?: string,
+): Promise<BrowserResearchResponse> {
+  return await postResearchRequest(baseUrl, "/read", request, profile);
+}
+
+export async function browserReadTable(
+  baseUrl: string | undefined,
+  request: Record<string, unknown>,
+  profile?: string,
+): Promise<BrowserResearchResponse> {
+  return await postResearchRequest(baseUrl, "/table", request, profile);
+}
+
+export async function browserSearch(
+  baseUrl: string | undefined,
+  request: Record<string, unknown>,
+  profile?: string,
+): Promise<BrowserResearchResponse> {
+  return await postResearchRequest(baseUrl, "/search", request, profile);
+}
+
 async function postDownloadRequest(
   baseUrl: string | undefined,
   route: "/wait/download" | "/download",

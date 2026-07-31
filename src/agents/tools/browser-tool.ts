@@ -3,6 +3,7 @@ import {
   browserAct,
   browserArmDialog,
   browserArmFileChooser,
+  browserDownload,
   browserNavigate,
   browserPdfSave,
   browserScreenshotAction,
@@ -28,6 +29,7 @@ import { loadConfig } from "../../config/config.js";
 import {
   executeActAction,
   executeConsoleAction,
+  executeResearchAction,
   executeSnapshotAction,
   executeTabsAction,
 } from "./browser-tool.actions.js";
@@ -313,7 +315,7 @@ export function createBrowserTool(opts?: {
     label: "Browser",
     name: "browser",
     description: [
-      "Control SigmaBrowser via the browser control server (status/start/stop/profiles/tabs/open/snapshot/screenshot/actions).",
+      "Control and research in SigmaBrowser via the browser control server (status/start/stop/profiles/tabs/open/snapshot/read/table/search/download/screenshot/actions).",
       "ALWAYS use THIS tool (NOT `web_fetch`) when the user asks to open a tab, open a site, navigate, go to, browse, visit, or interact with a page — including RU triggers like 'открой', 'открой вкладку', 'открой сайт', 'зайди на', 'перейди на', 'посмотри', 'покажи страницу', 'кликни', 'введи'. Map 'открой вкладку X' / 'открой X' / 'зайди на X' → action=\"open\" with targetUrl for that site (the valid action name is \"open\", NOT \"open_tab\"). If X is just a brand/domain fragment (e.g. 'вкуссвилл', 'авито'), resolve to the most likely official URL (vkusvill.ru, avito.ru) — DO NOT confuse with unrelated sites (e.g. 'вкуссвилл' is vkusvill.ru, NOT vk.com).",
       "The default profile controls the running SigmaBrowser instance through the Sigma Eclipse Extension relay — tabs are auto-attached, no user interaction required. Omit profile for most tasks.",
       "The Sigma Eclipse Extension automatically attaches the active tab so you can start browsing immediately — no user click or approval needed.",
@@ -323,6 +325,7 @@ export function createBrowserTool(opts?: {
       "Browser is always available — the Sigma Eclipse Extension auto-attaches tabs. No user clicks or confirmations needed.",
       'WORKFLOW: 1) action="snapshot" with refs="role" returns refs like [S1], [S2], etc.',
       '2) To interact, use action="act" with kind and ref from snapshot: kind="click" ref="S1", kind="type" ref="S2" text="...", kind="hover" ref="S3", kind="press" key="Enter".',
+      '3) To research facts, use action="read" for page text, action="table" for structured rows, or action="search" with query. Do not use snapshot as a substitute for reading.',
       "IMPORTANT: Never use fn with refs.find().click(). Always use kind=click/type/hover with ref=<refId> from the snapshot output. The ref parameter directly accepts snapshot ref IDs (e.g. S1, S42, e12).",
       "Keep the same targetId from the snapshot response for subsequent act calls on that tab.",
       'For stable, self-resolving refs across calls, use snapshot with refs="aria" (Playwright aria-ref ids). Default refs="role" are role+name-based.',
@@ -525,6 +528,35 @@ export function createBrowserTool(opts?: {
             profile,
             proxyRequest,
           });
+        case "read":
+        case "table":
+        case "search":
+          return await executeResearchAction({
+            action,
+            input: params,
+            baseUrl,
+            profile,
+            proxyRequest,
+          });
+        case "download": {
+          const ref = readStringParam(params, "ref", { required: true });
+          const path = readStringParam(params, "path", { required: true });
+          const { targetId, timeoutMs } = readOptionalTargetAndTimeout(params);
+          if (proxyRequest) {
+            return jsonResult(
+              await proxyRequest({
+                method: "POST",
+                path: "/download",
+                profile,
+                body: { ref, path, targetId, timeoutMs },
+                timeoutMs,
+              }),
+            );
+          }
+          return jsonResult(
+            await browserDownload(baseUrl, { ref, path, targetId, timeoutMs, profile }),
+          );
+        }
         case "screenshot": {
           const targetId = readStringParam(params, "targetId");
           const fullPage = Boolean(params.fullPage);

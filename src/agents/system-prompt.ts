@@ -452,6 +452,9 @@ export function buildAgentSystemPrompt(params: {
     availableTools.has("browser")
       ? "When resolving a brand/site name from the user message to a URL for `browser`, map it to the most likely official site (e.g. 'вкуссвилл' → vkusvill.ru, 'авито' → avito.ru, 'сбер' → sberbank.ru). Do not confuse unrelated brands (e.g. 'вкуссвилл' is NOT vk.com)."
       : "",
+    availableTools.has("browser")
+      ? 'For browser research, use action="snapshot" only to find controls for interaction. Use action="read" for page text, action="table" for structured rows, and action="search" for web search results. Copy researched numbers, dates, names, and prices exactly from read/table output; do not silently round or paraphrase them.'
+      : "",
     `For long waits, avoid rapid poll loops: use ${execToolName} with enough yieldMs or ${processToolName}(action=poll, timeout=<ms>).`,
     "If a task is more complex or takes longer, spawn a sub-agent. Completion is push-based: it will auto-announce when done.",
     ...(acpHarnessSpawnAllowed

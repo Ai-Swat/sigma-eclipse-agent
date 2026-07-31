@@ -22,7 +22,7 @@
       },
       "tools": {
         "profile": "minimal",
-        "alsoAllow": ["browser", "memory_get", "memory_search", "session_status"],
+        "alsoAllow": ["browser", "pdf", "memory_get", "memory_search", "session_status"],
         "deny": [
           "web_fetch",
           "web_search",
