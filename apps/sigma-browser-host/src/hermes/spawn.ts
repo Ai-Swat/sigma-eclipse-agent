@@ -185,6 +185,20 @@ const HERMES_PROXY_ENV_KEYS = [
   "all_proxy",
 ] as const;
 
+/** Grep hermes-launcher.log for this when verifying proxy spawn fix is live. */
+const SPAWN_PROXY_FIX_REV = "proxy-fix-v2";
+
+function formatInheritedProxyEnv(): string {
+  const parts: string[] = [];
+  for (const key of HERMES_PROXY_ENV_KEYS) {
+    const value = process.env[key];
+    if (value && value.trim().length > 0) {
+      parts.push(`${key}=${value.trim()}`);
+    }
+  }
+  return parts.length > 0 ? parts.join("; ") : "none";
+}
+
 /** Drop inherited proxy env vars before spawning the Hermes Python child. */
 function envWithoutProxies(): NodeJS.ProcessEnv {
   const env = { ...process.env };
@@ -192,6 +206,19 @@ function envWithoutProxies(): NodeJS.ProcessEnv {
     delete env[key];
   }
   return env;
+}
+
+function logHermesChildProxyEnv(childEnv: Record<string, string>): void {
+  const childProxyKeys = HERMES_PROXY_ENV_KEYS.filter((key) => {
+    const value = childEnv[key];
+    return typeof value === "string" && value.trim().length > 0;
+  });
+  console.log(
+    `[hermes-spawn] proxy-fix-rev=${SPAWN_PROXY_FIX_REV} ` +
+      `parent_proxy_env=${formatInheritedProxyEnv()} ` +
+      `child_proxy_keys=${childProxyKeys.join(",") || "none"} ` +
+      `child_NO_PROXY=${childEnv.NO_PROXY ?? ""}`,
+  );
 }
 
 export function spawnHermesChild(params: {
@@ -252,6 +279,13 @@ export function spawnHermesChild(params: {
     // CDP commands during tool calls. Empty/unset disables browser tools.
     env.SIGMA_HERMES_CDP_URL = config.cdpWsUrl.trim();
   }
+
+  const packManifest = readHermesPackManifest(paths.packDir);
+  console.log(
+    `[hermes-spawn] pack manifest version=${packManifest.version ?? "?"} ` +
+      `hermesVersion=${packManifest.hermesVersion ?? "?"}`,
+  );
+  logHermesChildProxyEnv(env);
 
   // Phase 1: launch our thin sigma_hermes_shim server, NOT
   // `hermes_cli.main gateway run`. Reasoning:
